@@ -1,3 +1,25 @@
+// gcc scratch-vm.c -o scratch-vm && ./scratch-vm
+// Ouput should be:
+// Advance
+// sprite.x: 12
+// Advance
+// sprite.x: 20
+// Advance
+// sprite.x: 28
+// Advance
+// sprite.x: 36
+// stack_index: 1
+// Advance
+// sprite.x: 36
+// stack_index: -1
+// Before the loop there are 4 move blocks each moving 1 step.
+// The loop is 4 times and the body of the loop is 4 blocks each moving 2 steps.
+// After first call to Advance function, the expected execution should be:
+// everything before the loop; loop body once.
+// That will move sprite to 12 = 4 + 4 * 2
+// The second call to Advance will execute loop body once.
+// etc.
+
 #include <stdio.h>
 
 int kOpCodeControlRepeat = 1;
@@ -27,6 +49,10 @@ typedef struct BlockMotionMoveSteps {
 } BlockMotionMoveSteps;
 
 void Advance(int* stack_index, BlockHeader* stack[], int dt_millis, int is_in_substack) {
+  if (*stack_index < 0) {
+    return;
+  }
+
   if (stack[*stack_index] == 0) {
     if (is_in_substack) {
       return;
@@ -124,14 +150,29 @@ int main(int argc, char* argv[]) {
   stack[0] = &move1.header;
   int stack_index = 0;
 
+  printf("Advance\n");
   Advance(&stack_index, stack, 16, 0);
   printf("sprite.x: %i\n", sprite.x);
 
+  printf("Advance\n");
   Advance(&stack_index, stack, 16, 0);
   printf("sprite.x: %i\n", sprite.x);
 
+  printf("Advance\n");
   Advance(&stack_index, stack, 16, 0);
   printf("sprite.x: %i\n", sprite.x);
+
+  printf("Advance\n");
+  Advance(&stack_index, stack, 16, 0);
+  printf("sprite.x: %i\n", sprite.x);
+
+  printf("stack_index: %i\n", stack_index);
+
+  printf("Advance\n");
+  Advance(&stack_index, stack, 16, 0);
+  printf("sprite.x: %i\n", sprite.x);
+
+  printf("stack_index: %i\n", stack_index);
 
   return 0;
 }
