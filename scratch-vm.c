@@ -1,29 +1,9 @@
-// gcc scratch-vm.c -o scratch-vm && ./scratch-vm
-// Ouput should be:
-// Advance
-// sprite.x: 12
-// Advance
-// sprite.x: 20
-// Advance
-// sprite.x: 28
-// Advance
-// sprite.x: 36
-// stack_index: 1
-// Advance
-// sprite.x: 36
-// stack_index: -1
-// Before the loop there are 4 move blocks each moving 1 step.
-// The loop is 4 times and the body of the loop is 4 blocks each moving 2 steps.
-// After first call to Advance function, the expected execution should be:
-// everything before the loop; loop body once.
-// That will move sprite to 12 = 4 + 4 * 2
-// The second call to Advance will execute loop body once.
-// etc.
-
 #include <stdio.h>
+#include <assert.h>
 
-int kOpCodeControlRepeat = 1;
-int kOpCodeMotionMoveSteps = 2;
+int kOpCodeControlRepeat = 100;
+int kOpCodeControlWait = 101;
+int kOpCodeMotionMoveSteps = 200;
 
 typedef struct Sprite {
   int x;
@@ -42,6 +22,12 @@ typedef struct BlockControlRepeat {
   int iterations;
   struct BlockHeader* sub_stack;
 } BlockControlRepeat;
+
+typedef struct BlockControlWait {
+  BlockHeader header;
+  int wait_millis;
+  int cur_wait;
+} BlockControlWait;
 
 typedef struct BlockMotionMoveSteps {
   struct BlockHeader header;
@@ -79,6 +65,18 @@ void Advance(int* stack_index, BlockHeader* stack[], int dt_millis, int is_in_su
     }
   }
 
+  if (stack[*stack_index]->op_code_type == kOpCodeControlWait) {
+    BlockControlWait* wait = (BlockControlWait*) stack[*stack_index];
+    // printf("kOpCodeControlWait, wait_millis: %i\n", wait->wait_millis);
+    wait->cur_wait += dt_millis;
+    if (wait->cur_wait >= wait->wait_millis) {
+      wait->cur_wait = wait->wait_millis;
+    }
+    if (wait->cur_wait < wait->wait_millis) {
+      return;
+    }
+  }
+
   if (stack[*stack_index]->op_code_type == kOpCodeMotionMoveSteps) {
     BlockMotionMoveSteps* move = (BlockMotionMoveSteps*) stack[*stack_index];
     // printf("kOpCodeMotionMoveSteps, steps: %i\n", move->steps);
@@ -105,14 +103,23 @@ int main(int argc, char* argv[]) {
   repeat.times = 4;
   repeat.iterations = 0;
 
+  BlockControlWait wait;
+  wait.header.sprite = &sprite;
+  wait.header.op_code_type = kOpCodeControlWait;
+  wait.wait_millis = 1000;
+
   move1.header.sprite = &sprite;
   move1.header.op_code_type = kOpCodeMotionMoveSteps;
   move1.header.next = &move2.header;
   move1.steps = 1;
   move2.header.sprite = &sprite;
   move2.header.op_code_type = kOpCodeMotionMoveSteps;
-  move2.header.next = &move3.header;
+  move2.header.next = &wait.header;
   move2.steps = 1;
+
+  wait.header.next = &move3.header;
+  wait.cur_wait = 0;
+
   move3.header.sprite = &sprite;
   move3.header.op_code_type = kOpCodeMotionMoveSteps;
   move3.header.next = &move4.header;
@@ -149,30 +156,29 @@ int main(int argc, char* argv[]) {
   BlockHeader* stack[5];
   stack[0] = &move1.header;
   int stack_index = 0;
+  int cur_time = 0;
+  int dt_millis = 0;
 
-  printf("Advance\n");
-  Advance(&stack_index, stack, 16, 0);
+  printf("Advance, cur_time: %i\n", cur_time);
+  dt_millis = 16;
+  Advance(&stack_index, stack, dt_millis, 0);
+  cur_time += dt_millis;
   printf("sprite.x: %i\n", sprite.x);
+  assert(sprite.x == 2);
 
-  printf("Advance\n");
-  Advance(&stack_index, stack, 16, 0);
+  printf("Advance, cur_time: %i\n", cur_time);
+  dt_millis = 84;
+  Advance(&stack_index, stack, dt_millis, 0);
+  cur_time += dt_millis;
   printf("sprite.x: %i\n", sprite.x);
+  assert(sprite.x == 2);
 
-  printf("Advance\n");
-  Advance(&stack_index, stack, 16, 0);
+  printf("Advance, cur_time: %i\n", cur_time);
+  dt_millis = 910;
+  Advance(&stack_index, stack, dt_millis, 0);
+  cur_time += dt_millis;
   printf("sprite.x: %i\n", sprite.x);
-
-  printf("Advance\n");
-  Advance(&stack_index, stack, 16, 0);
-  printf("sprite.x: %i\n", sprite.x);
-
-  printf("stack_index: %i\n", stack_index);
-
-  printf("Advance\n");
-  Advance(&stack_index, stack, 16, 0);
-  printf("sprite.x: %i\n", sprite.x);
-
-  printf("stack_index: %i\n", stack_index);
+  assert(sprite.x == 12);
 
   return 0;
 }
