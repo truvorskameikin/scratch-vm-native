@@ -1,184 +1,346 @@
 #include <stdio.h>
 #include <assert.h>
 
+int kOpCodeRunInplace = 1;
 int kOpCodeControlRepeat = 100;
 int kOpCodeControlWait = 101;
 int kOpCodeMotionMoveSteps = 200;
 
+struct Variable;
+struct Sprite;
+struct BlockControlWait;
+
+typedef float (*NumberExpressionFunction)(struct Sprite*);
+
+typedef void (*BlockFunction)(struct Sprite*, float dt);
+
+typedef int (*WaitFunction)(struct Sprite*, struct BlockControlWait* block, float dt);
+
+typedef struct Variable {
+  float number_value;
+  char* str_value;
+} Variable;
+
+typedef struct BlockBase {
+  BlockFunction function;
+  int op_code;
+  struct BlockBase* next;
+} BlockBase;
+
+typedef struct Program {
+  int stack_index;
+  BlockBase* stack[4];
+  int is_running;
+} Program;
+
 typedef struct Sprite {
-  int x;
-  int y;
+  float x;
+  float y;
+  float dir_x; // normalized
+  float dir_y;
+  // Variables:
+  Variable step;
+  Variable wait;
+  // Programs:
+  Program when_flag_clicked1;
+  // Blocks state:
+  int block_wait1_started;
+  float block_wait1_wait_time;
+  float block_wait1_cur_wait_time;
+  int block_wait2_started;
+  float block_wait2_wait_time;
+  float block_wait2_cur_wait_time;
+  int block_repeat1_iterations;
 } Sprite;
 
-typedef struct BlockHeader {
-  struct Sprite* sprite;
-  int op_code_type;
-  struct BlockHeader* next;
-} BlockHeader;
+typedef struct ClonedSprite {
+  Sprite* parent;
+} ClonedSprite;
+
+void MakeRunInplaceBlock(BlockBase* block, Sprite* s, BlockFunction func) {
+  block->function = func;
+  block->op_code = kOpCodeRunInplace;
+}
 
 typedef struct BlockControlRepeat {
-  struct BlockHeader header;
+  struct BlockBase base;
   int times;
-  int iterations;
-  struct BlockHeader* sub_stack;
+  struct BlockBase* sub_stack;
 } BlockControlRepeat;
 
+void MakeControlRepeatBlock(BlockControlRepeat* block, Sprite* s, int times) {
+  block->base.function = 0;
+  block->base.op_code = kOpCodeControlRepeat;
+  block->times = times;
+}
+
+typedef void (*WaitBlockFunction)(Sprite*, float dt, int* can_advance);
+
 typedef struct BlockControlWait {
-  BlockHeader header;
-  int wait_millis;
-  int cur_wait;
+  BlockBase base;
+  NumberExpressionFunction wait_time;
+  WaitFunction wait_function;
 } BlockControlWait;
 
-typedef struct BlockMotionMoveSteps {
-  struct BlockHeader header;
-  int steps;
-} BlockMotionMoveSteps;
+void MakeControlWaitBlock(BlockControlWait* block, NumberExpressionFunction wait_time, WaitFunction wait_function) {
+  block->base.function = 0;
+  block->base.op_code = kOpCodeControlWait;
+  block->wait_time = wait_time;
+  block->wait_function = wait_function;
+}
 
-void Advance(int* stack_index, BlockHeader* stack[], int dt_millis, int is_in_substack) {
-  if (*stack_index < 0) {
+void Advance(Sprite* sprite, Program* program, float dt_sec, int is_in_substack) {
+  if (program->stack_index < 0) {
     return;
   }
 
-  if (stack[*stack_index] == 0) {
+  if (program->stack[program->stack_index] == 0) {
     if (is_in_substack) {
       return;
     }
 
-    --(*stack_index);
+    --(program->stack_index);
   }
 
-  if (*stack_index < 0) {
+  if (program->stack_index < 0) {
     return;
   }
 
-  if (stack[*stack_index]->op_code_type == kOpCodeControlRepeat) {
-    BlockControlRepeat* repeat = (BlockControlRepeat*) stack[*stack_index];
-    // printf("kOpCodeControlRepeat, times: %i\n", repeat->times);
-    if (repeat->iterations < repeat->times) {
-      ++(*stack_index);
-      stack[*stack_index] = repeat->sub_stack;
+  printf("Op code: %i, ", program->stack[program->stack_index]->op_code);
 
-      ++repeat->iterations;
-
-      Advance(stack_index, stack, dt_millis, 1);
+  if (program->stack[program->stack_index]->function) {
+    printf("RunInplaceBlock\n");
+    program->stack[program->stack_index]->function(sprite, dt_sec);
+  } else if (program->stack[program->stack_index]->op_code == kOpCodeControlRepeat) {
+    BlockControlRepeat* repeat = (BlockControlRepeat*) program->stack[program->stack_index];
+  } else if (program->stack[program->stack_index]->op_code == kOpCodeControlWait) {
+    printf("BlockControlWait\n");
+    BlockControlWait* wait = (BlockControlWait*) program->stack[program->stack_index];
+    int result = wait->wait_function(sprite, wait, dt_sec);
+    if (!result) {
       return;
     }
   }
 
-  if (stack[*stack_index]->op_code_type == kOpCodeControlWait) {
-    BlockControlWait* wait = (BlockControlWait*) stack[*stack_index];
-    // printf("kOpCodeControlWait, wait_millis: %i\n", wait->wait_millis);
-    wait->cur_wait += dt_millis;
-    if (wait->cur_wait >= wait->wait_millis) {
-      wait->cur_wait = wait->wait_millis;
-    }
-    if (wait->cur_wait < wait->wait_millis) {
-      return;
-    }
+  program->stack[program->stack_index] = program->stack[program->stack_index]->next;
+  Advance(sprite, program, dt_sec, is_in_substack);
+}
+
+// Program:
+//
+// Set 'step' 2
+// Set 'wait' 1000 ms
+// Move 1
+// Move step
+// Set step step + 1
+// Wait 1000 ms
+// Move 1
+// Move step + 1
+// Wait wait + 2
+// Repeat 4:
+//    Move 1
+//    Move 1
+//    Move 1
+//    Move 1
+
+// Results in:
+//
+// Block: RunInplace1:
+//    Set step expression:
+//        2
+//    Set wait expression:
+//        1000 ms
+//    Move expression:
+//        1
+//    Move expression:
+//        step
+//    Set step expression:
+//        step + 1
+// Block: Wait expression:
+//     1000 ms
+// Block: RunInplace2:
+//    Move expression:
+//        1
+//    Move expression:
+//        step + 1
+// Block: Wait expression:
+//     wait + 2
+// Block: Repeat expression:
+//     4
+//    Block: RunInplace3
+//       Move expression:
+//           1
+//       Move expression:
+//           1
+//       Move expression:
+//           1
+//       Move expression:
+//           1
+
+void main_character_blockRunInplace1_func(Sprite* s, float dt) {
+  // Set 'step' 2
+  s->step.number_value = 2;
+
+  // Set 'wait' 1000 ms
+  s->wait.number_value = 1;
+
+  // Move 1
+  s->x += 1;
+
+  // Move 1
+  s->x += s->step.number_value;
+
+  // Set 'step' as 'step' + 1
+  s->step.number_value = s->step.number_value + 1;
+}
+
+float main_character_blockWait1_wait_time(Sprite* s) {
+  return 1;
+}
+
+int main_character_blockWait1_wait_function(Sprite* s, struct BlockControlWait* block, float dt) {
+  if (!s->block_wait1_started) {
+    s->block_wait1_wait_time = block->wait_time(s);
+    s->block_wait1_started = 1;
   }
 
-  if (stack[*stack_index]->op_code_type == kOpCodeMotionMoveSteps) {
-    BlockMotionMoveSteps* move = (BlockMotionMoveSteps*) stack[*stack_index];
-    // printf("kOpCodeMotionMoveSteps, steps: %i\n", move->steps);
-    stack[*stack_index]->sprite->x += move->steps;
+  s->block_wait1_cur_wait_time += dt;
+  if (s->block_wait1_cur_wait_time > s->block_wait1_wait_time) {
+    s->block_wait1_cur_wait_time = s->block_wait1_wait_time;
+    return 1;
+  }
+  return 0;
+}
+
+void main_character_blockRunInplace2_func(Sprite* s, float dt) {
+  // Move 1
+  s->x += 1;
+
+  // Move 'step' + 1
+  {
+    float dx = s->step.number_value + 1;
+    s->x += dx;
+  }
+}
+
+float main_character_blockWait2_wait_time(Sprite* s) {
+  return s->wait.number_value + 2;
+}
+
+int main_character_blockWait2_wait_function(Sprite* s, struct BlockControlWait* block, float dt) {
+  if (!s->block_wait2_started) {
+    s->block_wait2_wait_time = block->wait_time(s);
+    s->block_wait2_started = 1;
   }
 
-  stack[*stack_index] = stack[*stack_index]->next;
-  Advance(stack_index, stack, dt_millis, is_in_substack);
+  s->block_wait2_cur_wait_time += dt;
+  if (s->block_wait2_cur_wait_time > s->block_wait2_wait_time) {
+    s->block_wait2_cur_wait_time = s->block_wait2_wait_time;
+    return 1;
+  }
+  return 0;
+}
+
+void main_character_blockRunInplace3_func(Sprite* s, float dt) {
+  // Move 1
+  s->x += 1;
+
+  // Move 1
+  s->x += 1;
+
+  // Move 1
+  s->x += 1;
+
+  // Move 1
+  s->x += 1;
 }
 
 int main(int argc, char* argv[]) {
-  Sprite sprite;
-  sprite.x = 0;
-  sprite.y = 0;
+  Sprite main_character;
+  main_character.x = 0;
+  main_character.y = 0;
 
-  BlockMotionMoveSteps move1;
-  BlockMotionMoveSteps move2;
-  BlockMotionMoveSteps move3;
-  BlockMotionMoveSteps move4;
+  // Variables:
+  main_character.step.number_value = 0;
+  main_character.step.str_value = 0;
 
-  BlockControlRepeat repeat;
-  repeat.header.sprite = &sprite;
-  repeat.header.op_code_type = kOpCodeControlRepeat;
-  repeat.times = 4;
-  repeat.iterations = 0;
+  // Blocks state:
+  main_character.block_wait1_started = 0;
+  main_character.block_wait1_wait_time = 0;
+  main_character.block_wait1_cur_wait_time = 0;
+  main_character.block_wait2_started = 0;
+  main_character.block_wait2_wait_time = 0;
+  main_character.block_wait2_cur_wait_time = 0;
+  main_character.block_repeat1_iterations = 0;
 
-  BlockControlWait wait;
-  wait.header.sprite = &sprite;
-  wait.header.op_code_type = kOpCodeControlWait;
-  wait.wait_millis = 1000;
+  BlockBase main_character_blockRunInplace1;
+  BlockControlWait main_character_blockWait1;
+  BlockBase main_character_blockRunInplace2;
+  BlockControlWait main_character_blockWait2;
+  BlockControlRepeat main_character_blockRepeat1;
+  BlockBase main_character_blockRunInplace3;
 
-  move1.header.sprite = &sprite;
-  move1.header.op_code_type = kOpCodeMotionMoveSteps;
-  move1.header.next = &move2.header;
-  move1.steps = 1;
-  move2.header.sprite = &sprite;
-  move2.header.op_code_type = kOpCodeMotionMoveSteps;
-  move2.header.next = &wait.header;
-  move2.steps = 1;
+  main_character.when_flag_clicked1.stack_index = 0;
+  main_character.when_flag_clicked1.stack[0] = &main_character_blockRunInplace1;
+  main_character.when_flag_clicked1.is_running = 0;
 
-  wait.header.next = &move3.header;
-  wait.cur_wait = 0;
+  MakeRunInplaceBlock(&main_character_blockRunInplace1, &main_character, main_character_blockRunInplace1_func);
+  main_character_blockRunInplace1.next = &main_character_blockWait1.base;
 
-  move3.header.sprite = &sprite;
-  move3.header.op_code_type = kOpCodeMotionMoveSteps;
-  move3.header.next = &move4.header;
-  move3.steps = 1;
-  move4.header.sprite = &sprite;
-  move4.header.op_code_type = kOpCodeMotionMoveSteps;
-  move4.header.next = &repeat.header;
-  move4.steps = 1;
+  MakeControlWaitBlock(&main_character_blockWait1, main_character_blockWait1_wait_time, main_character_blockWait1_wait_function);
+  main_character_blockWait1.base.next = &main_character_blockRunInplace2;
 
-  BlockMotionMoveSteps move5;
-  BlockMotionMoveSteps move6;
-  BlockMotionMoveSteps move7;
-  BlockMotionMoveSteps move8;
+  MakeRunInplaceBlock(&main_character_blockRunInplace2, &main_character, main_character_blockRunInplace2_func);
+  main_character_blockRunInplace2.next = &main_character_blockWait2.base;
 
-  move5.header.sprite = &sprite;
-  move5.header.op_code_type = kOpCodeMotionMoveSteps;
-  move5.header.next = &move6.header;
-  move5.steps = 2;
-  move6.header.sprite = &sprite;
-  move6.header.op_code_type = kOpCodeMotionMoveSteps;
-  move6.header.next = &move7.header;
-  move6.steps = 2;
-  move7.header.sprite = &sprite;
-  move7.header.op_code_type = kOpCodeMotionMoveSteps;
-  move7.header.next = &move8.header;
-  move7.steps = 2;
-  move8.header.sprite = &sprite;
-  move8.header.op_code_type = kOpCodeMotionMoveSteps;
-  move8.header.next = 0;
-  move8.steps = 2;
+  MakeControlWaitBlock(&main_character_blockWait2, main_character_blockWait2_wait_time, main_character_blockWait2_wait_function);
+  main_character_blockWait2.base.next = &main_character_blockRepeat1.base;
 
-  repeat.sub_stack = &move5.header;
+  MakeControlRepeatBlock(&main_character_blockRepeat1, &main_character, 4);
+  main_character_blockRepeat1.sub_stack = &main_character_blockRunInplace3;
+  main_character_blockRepeat1.base.next = 0;
+  main_character_blockRunInplace3.next = &main_character_blockRepeat1.base;
 
-  BlockHeader* stack[5];
-  stack[0] = &move1.header;
-  int stack_index = 0;
+  MakeRunInplaceBlock(&main_character_blockRunInplace3, &main_character, main_character_blockRunInplace3_func);
+  main_character_blockRunInplace3.next = 0;
+
   int cur_time = 0;
   int dt_millis = 0;
 
-  printf("Advance, cur_time: %i\n", cur_time);
   dt_millis = 16;
-  Advance(&stack_index, stack, dt_millis, 0);
   cur_time += dt_millis;
-  printf("sprite.x: %i\n", sprite.x);
-  assert(sprite.x == 2);
-
   printf("Advance, cur_time: %i\n", cur_time);
+  Advance(&main_character, &main_character.when_flag_clicked1, dt_millis / 1000.0f, 0);
+  printf(" sprite.x: %f\n", main_character.x);
+  assert(main_character.x == 3);
+  printf(" sprite.step.number_value: %f\n", main_character.step.number_value);
+  printf(" sprite.wait.number_value: %f\n", main_character.wait.number_value);
+  assert(main_character.step.number_value == 3);
+  printf(" Ok\n");
+
   dt_millis = 84;
-  Advance(&stack_index, stack, dt_millis, 0);
   cur_time += dt_millis;
-  printf("sprite.x: %i\n", sprite.x);
-  assert(sprite.x == 2);
-
   printf("Advance, cur_time: %i\n", cur_time);
+  Advance(&main_character, &main_character.when_flag_clicked1, dt_millis / 1000.0f, 0);
+  printf(" sprite.x: %f\n", main_character.x);
+  assert(main_character.x == 3);
+  printf(" Ok\n");
+
   dt_millis = 910;
-  Advance(&stack_index, stack, dt_millis, 0);
   cur_time += dt_millis;
-  printf("sprite.x: %i\n", sprite.x);
-  assert(sprite.x == 12);
+  printf("Advance, cur_time: %i\n", cur_time);
+  Advance(&main_character, &main_character.when_flag_clicked1, dt_millis / 1000.0f, 0);
+  printf(" sprite.x: %f\n", main_character.x);
+  assert(main_character.x == 8);
+  printf(" Ok\n");
+
+  dt_millis = 1980;
+  cur_time += dt_millis;
+  printf("Advance, cur_time: %i\n", cur_time);
+  Advance(&main_character, &main_character.when_flag_clicked1, dt_millis / 1000.0f, 0);
+  printf(" sprite.x: %f\n", main_character.x);
+  assert(main_character.x == 8);
+  printf(" Ok\n");
 
   return 0;
 }
