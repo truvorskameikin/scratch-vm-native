@@ -1,3 +1,3 @@
 // Scratch Engine definitions
 
-extern Scratch_Init();
+extern void Scratch_Init();
