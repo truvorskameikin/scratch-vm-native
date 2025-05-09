@@ -7,12 +7,30 @@
 
 #include "{{ main_header_file }}"
 
-struct ScratchVariable;
+struct ScratchSprite;
 
-typedef struct ScratchVariable {
-  float number_value;
-  char* str_value;
-} ScratchVariable;
+typedef enum ScratchOpCode {
+kScratchWhenFlagClicked = 1,
+kScratchInPlace = 2,
+kScratchControlForever = 3,
+kScratchControlIf = 4,
+} ScratchOpCode;
+
+typedef void (*ImplaceBlockFunction)(struct ScratchSprite* sprite, float dt);
+
+typedef struct ScratchBlock {
+  struct ScratchBlock* next;
+  struct ScratchBlock* substack;
+  ScratchOpCode op_code;
+  ImplaceBlockFunction inplace_function;
+} ScratchBlock;
+
+typedef struct ScratchSprite {
+  float x;
+  float y;
+  float direction_x;
+  float direction_y;
+} ScratchSprite;
 
 void Scratch_AssignNumberVariable(ScratchVariable* variable, float number) {
   if (variable->str_value) {
@@ -42,8 +60,33 @@ ScratchVariable {{ variable.sprite_name }}_{{ variable.name }};
 {%- endfor %}
 
 // =====
-// Function for inplace blocks
+// Blocks
 // =====
+{%- for block in blocks %}
+ScratchBlock {{ block.block_name }};
+{%- endfor %}
+
+// =====
+// Inplace blocks functions
+// =====
+{%- for block in blocks %}
+{%- if block.op_code == "kScratchInPlace" %}
+void {{ block.block_name }}_function(ScratchSprite* sprite, float dt) {
+{%- for scratch_block in block.scratch_inplace_blocks %}
+  // Produce code for op_code = {{ scratch_block["opcode"] }}
+{%- endfor %}
+}
+{%- endif %}
+{%- endfor %}
+
+// =====
+// Scratch state and functions
+// =====
+float current_time = 0.0f;
+
+float Scratch_sensing_timer(struct ScratchSprite* sprite, float dt) {
+  return current_time;
+}
 
 // =====
 // Init
@@ -56,4 +99,27 @@ void Scratch_Init() {
   Scratch_AssignNumberVariable(&{{ variable.sprite_name }}_{{ variable.name }}, {{ variable.value }});
 {%- endif %}
 {%- endfor %}
+
+{%- for block in blocks %}
+  {{ block.block_name }}.op_code = {{ block.op_code }};
+{%- if block.next_block_name %}
+  {{ block.block_name }}.next = &{{ block.next_block_name }};
+{%- else %}
+  {{ block.block_name }}.next = 0;
+{%- endif %}
+{%- if block.substack_block_name %}
+  {{ block.block_name }}.substack = &{{ block.substack_block_name }};
+{%- else %}
+  {{ block.block_name }}.substack = 0;
+{%- endif %}
+{%- if block.op_code == "kScratchInPlace" %}
+  {{ block.block_name }}.inplace_function = {{ block.block_name }}_function;
+{%- else %}
+  {{ block.block_name }}.inplace_function = 0;
+{%- endif %}
+{%- endfor %}
+}
+
+ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name) {
+  return 0;
 }

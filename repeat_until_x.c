@@ -7,13 +7,6 @@
 
 #include "repeat_until_x.h"
 
-struct ScratchVariable;
-
-typedef struct ScratchVariable {
-  float number_value;
-  char* str_value;
-} ScratchVariable;
-
 void Scratch_AssignNumberVariable(ScratchVariable* variable, float number) {
   if (variable->str_value) {
     free(variable->str_value);
@@ -52,4 +45,8 @@ void Scratch_Init() {
   Scratch_AssignNumberVariable(&Stage_my_variable, 0.0);
   Scratch_AssignNumberVariable(&red_100x70_x, 51.0);
   Scratch_AssignNumberVariable(&red_100x70_y, 0.0);
+}
+
+ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name) {
+  return 0;
 }
