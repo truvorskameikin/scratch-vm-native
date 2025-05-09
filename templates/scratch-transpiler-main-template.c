@@ -73,7 +73,13 @@ ScratchBlock {{ block.block_name }};
 {%- if block.op_code == "kScratchInPlace" %}
 void {{ block.block_name }}_function(ScratchSprite* sprite, float dt) {
 {%- for scratch_block in block.scratch_inplace_blocks %}
+{%- if block.scratch_inplace_blocks_helpers[loop.index0] != None %}
+{%- if block.scratch_inplace_blocks[loop.index0]["opcode"] == "data_setvariableto" %}
+  Scratch_AssignNumberVariable(&{{ block.scratch_inplace_blocks_helpers[loop.index0]["variable_name"] }}, {{ block.scratch_inplace_blocks_helpers[loop.index0]["value"] }});
+{%- endif %}
+{%- else %}
   // Produce code for op_code = {{ scratch_block["opcode"] }}
+{%- endif %}
 {%- endfor %}
 }
 {%- endif %}

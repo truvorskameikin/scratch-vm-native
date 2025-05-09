@@ -77,7 +77,7 @@ ScratchBlock Stage_Inplace6;
 // =====
 void Stage_Inplace1_function(ScratchSprite* sprite, float dt) {
   // Produce code for op_code = data_setvariableto
-  // Produce code for op_code = data_setvariableto
+  Scratch_AssignNumberVariable(&Stage_Minutes, 0.0);
 }
 void Stage_Inplace3_function(ScratchSprite* sprite, float dt) {
   // Produce code for op_code = data_setvariableto
