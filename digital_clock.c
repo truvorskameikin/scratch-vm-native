@@ -55,11 +55,10 @@ void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
 // =====
 // Variables
 // =====
-ScratchVariable Stage_my_variable;
-ScratchVariable Stage_Minutes;
-ScratchVariable Stage_Seconds;
 ScratchVariable Stage_Prev_Time;
+ScratchVariable Stage_Minutes;
 ScratchVariable Stage_Cur_Time;
+ScratchVariable Stage_Seconds;
 
 // =====
 // Blocks
@@ -103,11 +102,10 @@ float Scratch_sensing_timer(struct ScratchSprite* sprite, float dt) {
 // Init
 // =====
 void Scratch_Init() {
-  Scratch_AssignNumberVariable(&Stage_my_variable, 0.0);
-  Scratch_AssignNumberVariable(&Stage_Minutes, 4.0);
-  Scratch_AssignNumberVariable(&Stage_Seconds, 1.0);
   Scratch_AssignNumberVariable(&Stage_Prev_Time, 20.096);
+  Scratch_AssignNumberVariable(&Stage_Minutes, 4.0);
   Scratch_AssignNumberVariable(&Stage_Cur_Time, 21.845);
+  Scratch_AssignNumberVariable(&Stage_Seconds, 1.0);
   Stage_event_whenflagclicked0.op_code = kScratchWhenFlagClicked;
   Stage_event_whenflagclicked0.next = &Stage_Inplace1;
   Stage_event_whenflagclicked0.substack = 0;

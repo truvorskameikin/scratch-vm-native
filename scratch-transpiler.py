@@ -22,10 +22,25 @@ def read_scratch_program(file_path: str):
             return json.loads(project_file.read())
 
 
+class SpriteName(str):
+    pass
+
+
+def extract_sprite_name(scratch_target) -> SpriteName:
+    return scratch_target["name"].replace(" ", "_")
+
+
+def extract_variable_name(scratch_target, scratch_variable_id):
+    return (
+        extract_sprite_name(scratch_target)
+        + "_"
+        + scratch_target["variables"][scratch_variable_id][0].replace(" ", "_")
+    )
+
+
 class Variable:
-    def __init__(self, sprite_name: str, name: str, value: str):
-        self.sprite_name = sprite_name
-        self.name = name
+    def __init__(self, variable_name: str, value: str):
+        self.variable_name = variable_name
         try:
             self.value = float(value)
             self.is_string = False
@@ -33,23 +48,25 @@ class Variable:
             self.value = value
             self.is_string = True
 
+    def __repr__(self):
+        return self.__str__()
 
-def extract_variables(scratch_json) -> list[Variable]:
-    result = []
-    for scratch_target in scratch_json["targets"]:
-        for variable_id, variable in scratch_target["variables"].items():
-            result.append(
-                Variable(
-                    scratch_target["name"],
-                    variable[0].replace(" ", "_"),
-                    variable[1],
-                )
-            )
-    return result
+    def __str__(self):
+        return f"Variable({self.variable_name}: {self.value})"
 
 
-class SpriteName(str):
-    pass
+def access_variable(
+    scratch_json, scratch_target, scratch_variable_id, all_variables_and_cache
+):
+    variable_name = extract_variable_name(scratch_target, scratch_variable_id)
+    if variable_name in all_variables_and_cache["cache"]:
+        return
+
+    variable_value = scratch_target["variables"][scratch_variable_id][1]
+    variable = Variable(variable_name, variable_value)
+
+    all_variables_and_cache["all_variables"].append(variable)
+    all_variables_and_cache["cache"][variable_name] = scratch_variable_id
 
 
 class Sprite:
@@ -58,23 +75,11 @@ class Sprite:
         self.is_stage = is_stage
 
 
-def extract_sprite_name(scratch_target) -> SpriteName:
-    return scratch_target["name"]
-
-
 def extract_sprites(scratch_json) -> dict[SpriteName, Sprite]:
     result: dict[SpriteName, Sprite] = {}
     for scratch_target in scratch_json["targets"]:
         sprite_name = extract_sprite_name(scratch_target)
         result[sprite_name] = Sprite(sprite_name, scratch_target["isStage"])
-
-
-class BlockName(str):
-    pass
-
-
-class BlockId(str):
-    pass
 
 
 class Block:
@@ -88,35 +93,49 @@ class Block:
         self.next_block_name = ""
         self.substack_block_name = ""
 
-    def set_inplace_blocks(self, scratch_json, scratch_inplace_blocks):
+    def set_inplace_blocks(
+        self,
+        scratch_json,
+        scratch_target,
+        all_variables_and_cache,
+        scratch_inplace_blocks,
+    ):
         self.scratch_inplace_blocks = scratch_inplace_blocks
         for b in self.scratch_inplace_blocks:
             self.scratch_inplace_blocks_op_codes.append(b["opcode"])
 
-            if b["opcode"] == "data_setvariableto" and b["inputs"]["VALUE"][1][0] == 10:
+            has_helper = False
+            if b["opcode"] == "data_setvariableto":
                 variable_id = b["fields"]["VARIABLE"][1]
-                found_monitor = None
-                for monitor in scratch_json["monitors"]:
-                    if monitor["id"] == variable_id:
-                        found_monitor = monitor
-                        break
 
-                if monitor:
-                    helper = {
-                        "variable_name": (
-                            found_monitor["spriteName"]
-                            if found_monitor["spriteName"]
-                            else "Stage"
-                            + "_"
-                            + found_monitor["params"]["VARIABLE"].replace(" ", "_")
-                        ),
-                        "value": float(b["inputs"]["VALUE"][1][1]),
-                    }
-                    print(helper)
-                    self.scratch_inplace_blocks_helpers.append(helper)
-                else:
-                    self.scratch_inplace_blocks_helpers.append(None)
-            else:
+                access_variable(
+                    scratch_json, scratch_target, variable_id, all_variables_and_cache
+                )
+
+                if b["inputs"]["VALUE"][1][0] == 10:
+                    variable_id = b["fields"]["VARIABLE"][1]
+
+                    found_monitor = None
+                    for monitor in scratch_json["monitors"]:
+                        if monitor["id"] == variable_id:
+                            found_monitor = monitor
+                            break
+
+                    if monitor:
+                        helper = {
+                            "variable_name": (
+                                found_monitor["spriteName"]
+                                if found_monitor["spriteName"]
+                                else "Stage"
+                                + "_"
+                                + found_monitor["params"]["VARIABLE"].replace(" ", "_")
+                            ),
+                            "value": float(b["inputs"]["VALUE"][1][1]),
+                        }
+                        self.scratch_inplace_blocks_helpers.append(helper)
+                        has_helper = True
+
+            if not has_helper:
                 self.scratch_inplace_blocks_helpers.append(None)
 
     def __repr__(self):
@@ -163,7 +182,9 @@ def to_known_op_codes(scratch_op_code):
         return "kScratchControlIf"
 
 
-def extract_blocks_r(scratch_json, scratch_target, scratch_block, all_blocks):
+def extract_blocks_and_variables_r(
+    scratch_json, scratch_target, scratch_block, all_blocks, all_variables_and_cache
+):
     inplace_blocks = []
 
     block = None
@@ -180,12 +201,21 @@ def extract_blocks_r(scratch_json, scratch_target, scratch_block, all_blocks):
         else:
             if len(inplace_blocks) > 0:
                 block = Block(kOpcodeRunInplace, scratch_cur_block["topLevel"])
-                block.set_inplace_blocks(scratch_json, inplace_blocks)
+                block.set_inplace_blocks(
+                    scratch_json,
+                    scratch_target,
+                    all_variables_and_cache,
+                    inplace_blocks,
+                )
                 block.block_name = f"{extract_sprite_name(scratch_target)}_Inplace{str(len(all_blocks))}"
                 all_blocks.append(block)
 
-                result = extract_blocks_r(
-                    scratch_json, scratch_target, scratch_cur_block, all_blocks
+                result = extract_blocks_and_variables_r(
+                    scratch_json,
+                    scratch_target,
+                    scratch_cur_block,
+                    all_blocks,
+                    all_variables_and_cache,
                 )
                 if result is not None:
                     block.next_block_name = result.block_name
@@ -202,18 +232,23 @@ def extract_blocks_r(scratch_json, scratch_target, scratch_block, all_blocks):
 
                 if has_substack(scratch_cur_block):
                     substack_id = scratch_cur_block["inputs"]["SUBSTACK"][1]
-                    substack_result = extract_blocks_r(
+                    substack_result = extract_blocks_and_variables_r(
                         scratch_json,
                         scratch_target,
                         scratch_target["blocks"][substack_id],
                         all_blocks,
+                        all_variables_and_cache,
                     )
 
                     if substack_result:
                         block.substack_block_name = substack_result.block_name
 
-                result = extract_blocks_r(
-                    scratch_json, scratch_target, scratch_next_block, all_blocks
+                result = extract_blocks_and_variables_r(
+                    scratch_json,
+                    scratch_target,
+                    scratch_next_block,
+                    all_blocks,
+                    all_variables_and_cache,
                 )
                 if result is not None:
                     block.next_block_name = result.block_name
@@ -222,7 +257,9 @@ def extract_blocks_r(scratch_json, scratch_target, scratch_block, all_blocks):
 
     if len(inplace_blocks) > 0:
         block = Block(kOpcodeRunInplace, scratch_cur_block["topLevel"])
-        block.set_inplace_blocks(scratch_json, inplace_blocks)
+        block.set_inplace_blocks(
+            scratch_json, scratch_target, all_variables_and_cache, inplace_blocks
+        )
         block.block_name = (
             f"{extract_sprite_name(scratch_target)}_Inplace{str(len(all_blocks))}"
         )
@@ -233,8 +270,9 @@ def extract_blocks_r(scratch_json, scratch_target, scratch_block, all_blocks):
     return block
 
 
-def extract_blocks(scratch_json):
+def extract_blocks_and_variables(scratch_json):
     all_blocks = []
+    all_variables_and_cache = {"all_variables": [], "cache": {}}
     for scratch_target in scratch_json["targets"]:
         top_level_block_ids = []
         for scratch_block_id, scratch_block in scratch_target["blocks"].items():
@@ -242,13 +280,14 @@ def extract_blocks(scratch_json):
                 top_level_block_ids.append(scratch_block_id)
 
         for scratch_top_level_block_id in top_level_block_ids:
-            extract_blocks_r(
+            extract_blocks_and_variables_r(
                 scratch_json,
                 scratch_target,
                 scratch_target["blocks"][scratch_top_level_block_id],
                 all_blocks,
+                all_variables_and_cache,
             )
-    return all_blocks
+    return all_blocks, all_variables_and_cache["all_variables"]
 
 
 def compile_scratch_program(scratch_json, output_stem: str):
@@ -265,9 +304,8 @@ def compile_scratch_program(scratch_json, output_stem: str):
             header_template = env.get_template("scratch-transpiler-main-template.h")
             header_file.write(header_template.render())
 
-            variables = extract_variables(scratch_json)
             sprites = extract_sprites(scratch_json)
-            blocks = extract_blocks(scratch_json)
+            blocks, variables = extract_blocks_and_variables(scratch_json)
 
             c_template = env.get_template("scratch-transpiler-main-template.c")
             c_file.write(

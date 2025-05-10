@@ -56,7 +56,7 @@ void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
 // Variables
 // =====
 {%- for variable in variables %}
-ScratchVariable {{ variable.sprite_name }}_{{ variable.name }};
+ScratchVariable {{ variable.variable_name }};
 {%- endfor %}
 
 // =====
@@ -100,9 +100,9 @@ float Scratch_sensing_timer(struct ScratchSprite* sprite, float dt) {
 void Scratch_Init() {
 {%- for variable in variables %}
 {%- if variable.is_string %}
-  Scratch_AssignStringVariable(&{{ variable.sprite_name }}_{{ variable.name }}, {{ variable.value }});
+  Scratch_AssignStringVariable(&{{ variable.variable_name }}, {{ variable.value }});
 {%- else %}
-  Scratch_AssignNumberVariable(&{{ variable.sprite_name }}_{{ variable.name }}, {{ variable.value }});
+  Scratch_AssignNumberVariable(&{{ variable.variable_name }}, {{ variable.value }});
 {%- endif %}
 {%- endfor %}
 
