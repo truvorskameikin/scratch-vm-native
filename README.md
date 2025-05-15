@@ -10,7 +10,8 @@ ninja -C builddir/ digital_clock
 ```
 
 Debug in VS Code:
-Add debug configuration in launch.json:
+
+Install CodeLLDB plugin and add debug configuration in launch.json:
 ```
 {
     "version": "0.2.0",
@@ -28,4 +29,5 @@ Add debug configuration in launch.json:
 ```
 
 Set breakpoint on `main`.
+
 Run debugger.
