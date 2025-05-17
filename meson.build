@@ -38,7 +38,7 @@ endforeach
 # - mandatory
 #   - name: binary and build target name
 #   - scratch_program: the full path to the translated Scratch program.
-#   - sources: any additional source files required for building the test binary. 
+#   - sources: any additional source files required for building the test binary.
 # - optional
 #   - deps: list of dependencies to test (e.g. gtest_dep for gtest)
 digital_clock_test = {
@@ -51,10 +51,10 @@ digital_clock_gtest = {
     'name' : 'digital_clock_gtest',
     'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
     'sources' : [ 'tests/digital_clock_gtest.cpp' ],
-    'deps' : [gtest_dep] 
+    'deps' : [gtest_dep]
 }
 
-# Build error: 
+# Build error:
 # repeat_until_x.c:111:37: error: ‘None’ undeclared (first use in this function)
 # 111 |   red_100x70_motion_sety2.op_code = None;
 # repeat_until_x_test = {
@@ -62,7 +62,7 @@ digital_clock_gtest = {
 #     'sources' : [ 'tests/repeat_until_x_test.c' ]
 # }
 
-gen_tests = [ 
+gen_tests = [
     digital_clock_test,
     digital_clock_gtest,
     #repeat_until_x_test
@@ -86,10 +86,10 @@ foreach test_target : gen_tests
             input: sb_prog,
             output: [base_name + '.c', base_name + '.h'],
             # Regenerate if script or templates changed
-            depend_files: [ 
-                meson.project_source_root() / 'scratch-transpiler.py', 
-                'templates/scratch-transpiler-main-template.c', 
-                'templates/scratch-transpiler-main-template.h' 
+            depend_files: [
+                meson.project_source_root() / 'scratch-transpiler.py',
+                'templates/scratch-transpiler-main-template.c',
+                'templates/scratch-transpiler-main-template.h'
             ]
         )
         scratch_gens = scratch_gens + { sb_prog : gen }
