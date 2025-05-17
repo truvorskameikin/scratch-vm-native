@@ -138,6 +138,12 @@ class Block:
             if not has_helper:
                 self.scratch_inplace_blocks_helpers.append(None)
 
+    @staticmethod
+    def inplace_block_to_functions(scratch_json, scratch_target, scratch_block):
+        # Last function is to use as block function.
+
+        return []
+
     def __repr__(self):
         return self.__str__()
 
