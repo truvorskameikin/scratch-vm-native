@@ -3,7 +3,6 @@ import zipfile
 import json
 from jinja2 import Environment, PackageLoader, select_autoescape
 
-
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="Scratch Transpiler",

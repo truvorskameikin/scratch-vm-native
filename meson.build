@@ -50,7 +50,8 @@ foreach sb_prog : scratch_programs
         'gen_' + base_name,
         command: [python, meson.project_source_root() / 'scratch-transpiler.py', '-i', sb_prog, '-o', base_name],
         input: sb_prog,
-        output: [base_name + '.c', base_name + '.h', base_name + '_test.c']
+        output: [base_name + '.c', base_name + '.h', base_name + '_test.c'],
+        depend_files: [ meson.project_source_root() / 'scratch-transpiler.py' ]
     )
 
     gen_exe = executable(
