@@ -13,6 +13,10 @@ project(
     ],
 )
 
+# gtest enable
+gtest = subproject('gtest')
+gtest_dep = gtest.get_variable('gtest_main_dep')
+
 fs = import('fs')
 inc = include_directories('.')
 
@@ -35,9 +39,16 @@ endforeach
 #   - scratch_program: the full path to the translated Scratch program.
 #   - sources: any additional source files required for building the test binary. 
 digital_clock_test = {
-    'name': 'digital_clock_test',
+    'name' : 'digital_clock_test',
     'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
     'sources' : [ 'tests/digital_clock_test.c' ]
+}
+
+digital_clock_gtest = {
+    'name' : 'digital_clock_gtest',
+    'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
+    'sources' : [ 'tests/digital_clock_gtest.cpp' ],
+    'deps' : [gtest_dep] 
 }
 
 # Build error: 
@@ -50,28 +61,41 @@ digital_clock_test = {
 
 gen_tests = [ 
     digital_clock_test,
+    digital_clock_gtest,
     #repeat_until_x_test
 ]
+
+scratch_gens = {}
 
 foreach test_target : gen_tests
     exe_name = test_target['name']
     sb_prog = test_target['scratch_program']
     bin_sources = test_target['sources']
+    deps = test_target.get('deps', [])
 
     base_name = fs.replace_suffix(fs.name(sb_prog), '')
     message('Generate: ' + exe_name)
 
-    gen = custom_target(
-        'gen_' + base_name,
-        command: [python, meson.project_source_root() / 'scratch-transpiler.py', '-i', sb_prog, '-o', base_name],
-        input: sb_prog,
-        output: [base_name + '.c', base_name + '.h'],
-        depend_files: [ meson.project_source_root() / 'scratch-transpiler.py' ]
-    )
+    if not scratch_gens.has_key(sb_prog)
+        gen = custom_target(
+            'gen_' + base_name,
+            command: [python, meson.project_source_root() / 'scratch-transpiler.py', '-i', sb_prog, '-o', base_name],
+            input: sb_prog,
+            output: [base_name + '.c', base_name + '.h'],
+            # Regenerate if script or templates changed
+            depend_files: [ 
+                meson.project_source_root() / 'scratch-transpiler.py', 
+                'templates/scratch-transpiler-main-template.c', 
+                'templates/scratch-transpiler-main-template.h' 
+            ]
+        )
+        scratch_gens = scratch_gens + { sb_prog : gen }
+    endif
 
     gen_exe = executable(
         exe_name,
-        gen.to_list() + bin_sources,
+        scratch_gens[sb_prog].to_list() + bin_sources,
+        dependencies: deps,
         include_directories: inc,
     )
 

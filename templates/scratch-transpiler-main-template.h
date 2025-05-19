@@ -1,10 +1,19 @@
 // Scratch Engine definitions
+#pragma once
 
-extern void Scratch_Init();
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void Scratch_Init();
 
 typedef struct ScratchVariable {
   float number_value;
   char* str_value;
 } ScratchVariable;
 
-extern ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name);
+ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name);
+
+#ifdef __cplusplus
+}
+#endif
