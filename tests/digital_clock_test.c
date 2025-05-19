@@ -1,4 +1,4 @@
-#include "{{ main_header_file }}"
+#include "digital_clock.h"
 
 int main(int argc, char *argv[]) {
     Scratch_Init();

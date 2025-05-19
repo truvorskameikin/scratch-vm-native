@@ -3,6 +3,7 @@ import zipfile
 import json
 from jinja2 import Environment, PackageLoader, select_autoescape
 
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="Scratch Transpiler",
@@ -292,37 +293,28 @@ def extract_blocks_and_variables(scratch_json):
 def compile_scratch_program(scratch_json, output_stem: str):
     header_file_path = f"{output_stem}.h"
     c_file_path = f"{output_stem}.c"
-    c_test_file_path = f"{output_stem}_test.c"
 
     with open(header_file_path, "w") as header_file:
         with open(c_file_path, "w") as c_file:
-            with open(c_test_file_path, "w") as c_test_file:
-                env = Environment(
-                    loader=PackageLoader("scratch-transpiler"),
-                    autoescape=select_autoescape(),
+            env = Environment(
+                loader=PackageLoader("scratch-transpiler"),
+                autoescape=select_autoescape(),
+            )
+
+            header_template = env.get_template("scratch-transpiler-main-template.h")
+            header_file.write(header_template.render())
+
+            sprites = extract_sprites(scratch_json)
+            blocks, variables = extract_blocks_and_variables(scratch_json)
+
+            c_template = env.get_template("scratch-transpiler-main-template.c")
+            c_file.write(
+                c_template.render(
+                    main_header_file=header_file_path,
+                    variables=variables,
+                    blocks=blocks,
                 )
-
-                header_template = env.get_template("scratch-transpiler-main-template.h")
-                header_file.write(header_template.render())
-
-                sprites = extract_sprites(scratch_json)
-                blocks, variables = extract_blocks_and_variables(scratch_json)
-
-                c_template = env.get_template("scratch-transpiler-main-template.c")
-                c_file.write(
-                    c_template.render(
-                        main_header_file=header_file_path,
-                        variables=variables,
-                        blocks=blocks,
-                    )
-                )
-
-                c_test_template = env.get_template("scratch-transpiler-test-template.c")
-                c_test_file.write(
-                    c_test_template.render(
-                        main_header_file=header_file_path,
-                    )
-                )
+            )
 
 
 def main():

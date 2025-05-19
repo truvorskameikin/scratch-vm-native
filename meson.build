@@ -30,34 +30,49 @@ foreach module : required_modules
     endif
 endforeach
 
+# Describe the test using a dictionary with following mandatory fields:
+#   - name: binary and build target name
+#   - scratch_program: the full path to the translated Scratch program.
+#   - sources: any additional source files required for building the test binary. 
+digital_clock_test = {
+    'name': 'digital_clock_test',
+    'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
+    'sources' : [ 'tests/digital_clock_test.c' ]
+}
 
-scratch_programs = [ 
-    meson.project_source_root() / 'digital_clock.sb3',
-    
-    # Build error: 
-    # repeat_until_x.c:111:37: error: ‘None’ undeclared (first use in this function)
-    # 111 |   red_100x70_motion_sety2.op_code = None;
-    # meson.project_source_root() / 'repeat_until_x.sb3',
-    # meson.project_source_root() / 'test_program.sb3'
+# Build error: 
+# repeat_until_x.c:111:37: error: ‘None’ undeclared (first use in this function)
+# 111 |   red_100x70_motion_sety2.op_code = None;
+# repeat_until_x_test = {
+#     'scratch_program' : meson.project_source_root() / 'repeat_until_x.sb3',
+#     'sources' : [ 'tests/repeat_until_x_test.c' ]
+# }
+
+gen_tests = [ 
+    digital_clock_test,
+    #repeat_until_x_test
 ]
 
-foreach sb_prog : scratch_programs
-    file_name = fs.name(sb_prog)
-    base_name = fs.replace_suffix(file_name, '')
-    message('Generate: ' + base_name)
+foreach test_target : gen_tests
+    exe_name = test_target['name']
+    sb_prog = test_target['scratch_program']
+    bin_sources = test_target['sources']
+
+    base_name = fs.replace_suffix(fs.name(sb_prog), '')
+    message('Generate: ' + exe_name)
 
     gen = custom_target(
         'gen_' + base_name,
         command: [python, meson.project_source_root() / 'scratch-transpiler.py', '-i', sb_prog, '-o', base_name],
         input: sb_prog,
-        output: [base_name + '.c', base_name + '.h', base_name + '_test.c'],
+        output: [base_name + '.c', base_name + '.h'],
         depend_files: [ meson.project_source_root() / 'scratch-transpiler.py' ]
     )
 
     gen_exe = executable(
-        base_name,
-        gen.to_list(),
-        include_directories: inc
+        exe_name,
+        gen.to_list() + bin_sources,
+        include_directories: inc,
     )
 
 endforeach
