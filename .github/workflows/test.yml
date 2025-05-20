@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install dependencies
+      run: sudo apt-get -y install python3-pip ninja-build
+    - name: Install latest Meson
+      run: pip3 install --user meson
+    - name: Install transpiler dependencies
+      run: pip3 install --user jinja2
+    - name: Configure build
+      run: export PATH=$HOME/.local/bin:$PATH; meson setup builddir
+    - name: Run tests
+      run: ninja -C builddir test
