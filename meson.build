@@ -24,11 +24,7 @@ add_project_arguments('-Wno-unused-parameter', language: ['c', 'cpp'])
 
 python = find_program('python3')
 
-vscode = find_program('codium')
-if not vscode.found()
-    vscode = find_program('code')
-endif
-
+vscode = find_program('codium', 'code', required : false)
 
 # Required Python packages
 required_modules = ['jinja2']
