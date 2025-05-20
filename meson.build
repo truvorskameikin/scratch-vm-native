@@ -101,5 +101,7 @@ foreach test_target : gen_tests
         dependencies: deps,
         include_directories: inc,
     )
+    # Add the test to meson test list
+    test(exe_name, gen_exe)
 
 endforeach
