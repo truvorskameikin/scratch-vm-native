@@ -6,28 +6,22 @@ black scratch-transpiler.py && python3 scratch-transpiler.py --input digital_clo
 Build:
 ```
 meson setup builddir/
-ninja -C builddir/ digital_clock
+ninja -C builddir/ digital_clock_test
+```
+
+Run all tests
+```
+ninja -C builddir/ test
+```
+
+Run a specific test:
+```
+ninja -C builddir/ digital_clock_test_run
 ```
 
 Debug in VS Code:
 
-Install CodeLLDB plugin and add debug configuration in launch.json:
+Set breakpoint.
 ```
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug digital_clock",
-            "program": "${workspaceFolder}/builddir/digital_clock",
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
-    ]
-}
+ninja -C builddir/ digital_clock_test_dbg
 ```
-
-Set breakpoint on `main`.
-
-Run debugger.

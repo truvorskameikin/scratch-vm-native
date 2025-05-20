@@ -9,7 +9,7 @@ project(
         'c_std=gnu11',
         'cpp_std=c++2a',
         'warning_level=3',
-        'werror=true',
+        'werror=true'
     ],
 )
 
@@ -23,6 +23,12 @@ inc = include_directories('.')
 add_project_arguments('-Wno-unused-parameter', language: ['c', 'cpp'])
 
 python = find_program('python3')
+
+vscode = find_program('codium')
+if not vscode.found()
+    vscode = find_program('code')
+endif
+
 
 # Required Python packages
 required_modules = ['jinja2']
@@ -101,7 +107,18 @@ foreach test_target : gen_tests
         dependencies: deps,
         include_directories: inc,
     )
+
     # Add the test to meson test list
     test(exe_name, gen_exe)
 
+    # update launch.json on configure
+    meson.add_postconf_script(python, meson.project_source_root() / 'scripts' / 'update_launchjson.py', exe_name, gen_exe.full_path())
+
+    # Add run command
+    run_target(exe_name + '_run', command: [gen_exe], depends: [gen_exe])
+
+    # Run debugger in vscode (CodeLLDB plugin required)
+    if vscode.found()
+        run_target(exe_name + '_dbg', command: [vscode, '--open-url', 'vscode://vadimcn.vscode-lldb/launch?name=' + exe_name], depends: [gen_exe])
+    endif
 endforeach
