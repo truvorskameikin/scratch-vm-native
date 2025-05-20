@@ -34,10 +34,13 @@ foreach module : required_modules
     endif
 endforeach
 
-# Describe the test using a dictionary with following mandatory fields:
+# Describe the test using a dictionary with following fields:
+# - mandatory
 #   - name: binary and build target name
 #   - scratch_program: the full path to the translated Scratch program.
 #   - sources: any additional source files required for building the test binary. 
+# - optional
+#   - deps: list of dependencies to test (e.g. gtest_dep for gtest)
 digital_clock_test = {
     'name' : 'digital_clock_test',
     'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
