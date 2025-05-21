@@ -7,19 +7,30 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
-
+  linux-tests:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: sudo apt-get -y install python3-pip ninja-build
+    - uses: actions/checkout@v4
     - name: Install latest Meson
       run: pip3 install --user meson
     - name: Install transpiler dependencies
       run: pip3 install --user jinja2
     - name: Configure build
-      run: export PATH=$HOME/.local/bin:$PATH; meson setup builddir
+      run: meson setup builddir
+    - name: Run tests
+      run: ninja -C builddir test
+
+macos-tests:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install latest Meson
+      run: pip3 install --user meson
+    - name: Install transpiler dependencies
+      run: pip3 install --user jinja2
+    - name: Configure build
+      run: meson setup builddir
     - name: Run tests
       run: ninja -C builddir test
