@@ -33,9 +33,9 @@ jobs:
         echo PATH=$PATH >> $GITHUB_ENV
         echo VIRTUAL_ENV=$VIRTUAL_ENV >> $GITHUB_ENV
     - name: Install latest Meson
-      run: pip3 install --user meson
+      run: pip3 install meson
     - name: Install transpiler dependencies
-      run: pip3 install --user jinja2
+      run: pip3 install jinja2
     - name: Configure build
       run: meson setup builddir
     - name: Run tests
