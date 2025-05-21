@@ -26,12 +26,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Prepare virtual env
+      run: |
+        python3 -m venv pvenv
+        source pvenv/bin/activate
+        echo PATH=$PATH >> $GITHUB_ENV
+        echo VIRTUAL_ENV=$VIRTUAL_ENV >> $GITHUB_ENV
     - name: Install latest Meson
-      run: python3 -m venv pvenv
-    - run: source pvenv/bin/activate
-    - run: python3 -m pip install meson
+      run: pip3 --user install meson
     - name: Install transpiler dependencies
-      run: python3 -m pip install jinja2
+      run: pip3 --user install jinja2
     - name: Configure build
       run: meson setup builddir
     - name: Run tests
