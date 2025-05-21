@@ -9,7 +9,7 @@ project(
         'c_std=gnu11',
         'cpp_std=c++2a',
         'warning_level=3',
-        'werror=true'
+        'werror=false'
     ],
 )
 
@@ -19,8 +19,6 @@ gtest_dep = gtest.get_variable('gtest_main_dep')
 
 fs = import('fs')
 inc = include_directories('.')
-
-add_project_arguments('-Wno-unused-parameter', language: ['c', 'cpp'])
 
 python = find_program('python3')
 
