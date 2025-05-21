@@ -21,7 +21,7 @@ jobs:
     - name: Run tests
       run: ninja -C builddir test
 
-macos-tests:
+  macos-tests:
     runs-on: macos-latest
 
     steps:
