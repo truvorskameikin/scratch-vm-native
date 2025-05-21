@@ -28,8 +28,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install latest Meson
       run: python3 -m venv pvenv
-      run: source pvenv/bin/activate
-      run: python3 -m pip install meson
+    - run: source pvenv/bin/activate
+    - run: python3 -m pip install meson
     - name: Install transpiler dependencies
       run: python3 -m pip install jinja2
     - name: Configure build
