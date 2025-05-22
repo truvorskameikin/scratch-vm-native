@@ -22,7 +22,7 @@ inc = include_directories('.')
 
 python = find_program('python3')
 
-vscode = find_program('codium', 'code', required : false)
+vscode = find_program('codium', 'code', '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code', required : false)
 
 # Required Python packages
 required_modules = ['jinja2']
