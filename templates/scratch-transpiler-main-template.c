@@ -14,6 +14,7 @@ kScratchWhenFlagClicked = 1,
 kScratchInPlace = 2,
 kScratchControlForever = 3,
 kScratchControlIf = 4,
+kScratchControlWait = 5,
 } ScratchOpCode;
 
 typedef void (*ImplaceBlockFunction)(struct ScratchSprite* sprite, float dt);

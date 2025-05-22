@@ -30,11 +30,23 @@ def extract_sprite_name(scratch_target) -> SpriteName:
     return scratch_target["name"].replace(" ", "_")
 
 
-def extract_variable_name(scratch_target, scratch_variable_id):
-    return (
-        extract_sprite_name(scratch_target)
-        + "_"
-        + scratch_target["variables"][scratch_variable_id][0].replace(" ", "_")
+def extract_variable_name(scratch_json, scratch_target, scratch_variable_id):
+    if scratch_variable_id in scratch_target["variables"]:
+        return (
+            scratch_target,
+            extract_sprite_name(scratch_target)
+            + "_"
+            + scratch_target["variables"][scratch_variable_id][0].replace(" ", "_"),
+        )
+
+    scratch_stage_target = None
+    for scratch_target in scratch_json["targets"]:
+        if scratch_target["isStage"]:
+            scratch_stage_target = scratch_target
+            break
+
+    return extract_variable_name(
+        scratch_json, scratch_stage_target, scratch_variable_id
     )
 
 
@@ -58,11 +70,13 @@ class Variable:
 def access_variable(
     scratch_json, scratch_target, scratch_variable_id, all_variables_and_cache
 ):
-    variable_name = extract_variable_name(scratch_target, scratch_variable_id)
+    scratch_variable_target, variable_name = extract_variable_name(
+        scratch_json, scratch_target, scratch_variable_id
+    )
     if variable_name in all_variables_and_cache["cache"]:
         return
 
-    variable_value = scratch_target["variables"][scratch_variable_id][1]
+    variable_value = scratch_variable_target["variables"][scratch_variable_id][1]
     variable = Variable(variable_name, variable_value)
 
     all_variables_and_cache["all_variables"].append(variable)
@@ -130,7 +144,7 @@ class Block:
                                 + "_"
                                 + found_monitor["params"]["VARIABLE"].replace(" ", "_")
                             ),
-                            "value": float(b["inputs"]["VALUE"][1][1]),
+                            "value": b["inputs"]["VALUE"][1][1],
                         }
                         self.scratch_inplace_blocks_helpers.append(helper)
                         has_helper = True
@@ -186,6 +200,8 @@ def to_known_op_codes(scratch_op_code):
         return "kScratchControlForever"
     if scratch_op_code == "control_if":
         return "kScratchControlIf"
+    if scratch_op_code == "control_wait":
+        return "kScratchControlWait"
 
 
 def extract_blocks_and_variables_r(
