@@ -5,9 +5,9 @@
 // TODO(truvorskameikin): Remove direct access to functions and variables. Tests should use Scratch_Advance and Scratch_FindVariable functions.
 extern "C" {
 struct ScratchSprite;
-void Sprite1_Inplace1_function(ScratchSprite* sprite, float dt);
-ScratchVariable Stage_Number;
-ScratchVariable Stage_Another_Number;
+extern void Sprite1_Inplace1_function(ScratchSprite* sprite, float dt);
+extern ScratchVariable Stage_Number;
+extern ScratchVariable Stage_Another_Number;
 }
 
 TEST(variables_gtest, simple) {
