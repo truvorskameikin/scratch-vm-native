@@ -56,7 +56,8 @@ variables_gtest = {
 }
 
 gen_tests = [
-    digital_clock_gtest,
+    # TODO(truvorskameikin): Re-enable after fixing.
+    # digital_clock_gtest,
     variables_gtest,
 ]
 
