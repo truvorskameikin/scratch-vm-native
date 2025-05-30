@@ -34,6 +34,11 @@ typedef struct ScratchSprite {
   float direction_y;
 } ScratchSprite;
 
+void Scratch_InitVariable(ScratchVariable* variable) {
+  variable->str_value = 0;
+  variable->number_value = 0;
+}
+
 void Scratch_AssignNumberVariable(ScratchVariable* variable, float number) {
   if (variable->str_value) {
     free(variable->str_value);
@@ -126,6 +131,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignNumberVariable(&result, {{ helper.arguments[0] }});
   return result;
 }
@@ -135,6 +141,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignStringVariable(&result, "{{ helper.arguments[0] }}");
   return result;
 }
@@ -144,6 +151,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignVariable(&result, &{{ helper.arguments[0] }});
   return result;
 }
@@ -164,7 +172,9 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
+  
   ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num1) + Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
@@ -179,7 +189,9 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
+  
   ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num1) * Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
@@ -194,7 +206,9 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
+  
   ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num1) / Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
@@ -209,7 +223,9 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
+  
   ScratchVariable result = Scratch_JoinStringVariables(&num1, &num2);
+  Scratch_InitVariable(&result);
 
   Scratch_FreeVariable(&num1);
   Scratch_FreeVariable(&num2);
@@ -222,8 +238,10 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
+  
   ScratchVariable result;
-  Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num));
+  Scratch_InitVariable(&result);
+  Scratch_AssignNumberVariable(&result, sqrt(Scratch_ReadNumberVariable(&num)));
 
   Scratch_FreeVariable(&num);
 
@@ -256,6 +274,7 @@ float Scratch_sensing_timer(struct ScratchSprite* sprite, float dt) {
 // =====
 void Scratch_Init(void) {
 {%- for variable in variables %}
+  Scratch_InitVariable(&{{ variable.variable_name }});
 {%- if variable.is_string %}
   Scratch_AssignStringVariable(&{{ variable.variable_name }}, "{{ variable.value }}");
 {%- else %}
