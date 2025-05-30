@@ -2,6 +2,7 @@
 // Scratch Engine definitions
 // =====
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -42,6 +43,10 @@ void Scratch_AssignNumberVariable(ScratchVariable* variable, float number) {
   variable->number_value = number;
 }
 
+double Scratch_ReadNumberVariable(ScratchVariable* variable) {
+  return variable->number_value;
+}
+
 void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
   if (variable->str_value) {
     free(variable->str_value);
@@ -51,6 +56,21 @@ void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
   size_t l = strlen(str);
   variable->str_value = malloc(l + 1);
   memcpy(variable->str_value, str, l + 1);
+}
+
+void Scratch_AssignVariable(ScratchVariable* variable, ScratchVariable* rhv) {
+  if (rhv->str_value) {
+    Scratch_AssignStringVariable(variable, rhv->str_value);
+  } else {
+    Scratch_AssignNumberVariable(variable, rhv->number_value);
+  }
+}
+
+void Scratch_FreeVariable(ScratchVariable* variable) {
+  if (variable->str_value) {
+    free(variable->str_value);
+    variable->str_value = 0;
+  }
 }
 
 // =====
@@ -72,36 +92,94 @@ ScratchBlock {{ block.block_name }};
 // =====
 {%- for block in blocks %}
 {%- if block.op_code == "kScratchInPlace" %}
-void {{ block.block_name }}_function(ScratchSprite* sprite, float dt) {
-{%- for scratch_block in block.scratch_inplace_blocks %}
-{%- if block.scratch_inplace_blocks_helpers[loop.index0] != None %}
-{%- if block.scratch_inplace_blocks[loop.index0]["opcode"] == "data_setvariableto" %}
-  Scratch_AssignNumberVariable(&{{ block.scratch_inplace_blocks_helpers[loop.index0]["variable_name"] }}, {{ block.scratch_inplace_blocks_helpers[loop.index0]["value"] }});
+{%- for helpers in block.scratch_inplace_blocks_helpers %}
+// Inplace block helper:
+{%- for helper in helpers %}
+{%- if helper.op_code == "read_value_number" %}
+double {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+  return {{ helper.arguments[0] }};
+}
 {%- endif %}
-{%- else %}
-  // Produce code for op_code = {{ scratch_block["opcode"] }}
+{%- if helper.op_code == "read_value" %}
+ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+  ScratchVariable result;
+  return result;
+}
 {%- endif %}
-{%- endfor %}
+{%- if helper.op_code == "read_variable_number" %}
+double {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+  return Scratch_ReadNumberVariable(&{{ helper.arguments[0] }});
+}
+{%- endif %}
+{%- if helper.op_code == "set_variable" %}
+void {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+{%- if helper.arguments[1] == "double" %}
+  Scratch_AssignNumberVariable(&{{ helper.arguments[0] }}, {{ helper.arguments[2] }}(sprite, dt));
+{%- endif %}
+}
+{%- endif %}
+{%- if helper.op_code == "operator_add" %}
+double {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+  return {{ helper.arguments[0] }}(sprite, dt) + {{ helper.arguments[1] }}(sprite, dt);
+}
+{%- endif %}
+{%- if helper.op_code == "operator_multiply" %}
+double {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+  return {{ helper.arguments[0] }}(sprite, dt) * {{ helper.arguments[1] }}(sprite, dt);
+}
+{%- endif %}
+{%- if helper.op_code == "operator_divide" %}
+double {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
+  return {{ helper.arguments[0] }}(sprite, dt) / {{ helper.arguments[1] }}(sprite, dt);
+}
+{%- endif %}
+{%- if helper.op_code == "sqrt" %}
+double {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+  return sqrt({{ helper.arguments[0] }}(sprite, dt));
 }
 {%- endif %}
 {%- endfor %}
-
+{%- endfor %}
+// Inplace block function:
+void {{ block.block_name }}_function(ScratchSprite* sprite, float dt) {
+{%- for function in block.scratch_functions %}
+  {{ function }}(sprite, dt);
+{%- endfor %}
+}
+{% endif %}
+{%- endfor %}
 // =====
 // Scratch state and functions
 // =====
 float current_time = 0.0f;
 
 float Scratch_sensing_timer(struct ScratchSprite* sprite, float dt) {
+  (void) sprite;
+  (void) dt;
   return current_time;
 }
 
 // =====
 // Init
 // =====
-void Scratch_Init() {
+void Scratch_Init(void) {
 {%- for variable in variables %}
 {%- if variable.is_string %}
-  Scratch_AssignStringVariable(&{{ variable.variable_name }}, {{ variable.value }});
+  Scratch_AssignStringVariable(&{{ variable.variable_name }}, "{{ variable.value }}");
 {%- else %}
   Scratch_AssignNumberVariable(&{{ variable.variable_name }}, {{ variable.value }});
 {%- endif %}
@@ -128,5 +206,8 @@ void Scratch_Init() {
 }
 
 ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name) {
+  (void) sprite_name;
+  (void) variable_name;
   return 0;
 }
+

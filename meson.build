@@ -41,12 +41,6 @@ endforeach
 #   - sources: any additional source files required for building the test binary.
 # - optional
 #   - deps: list of dependencies to test (e.g. gtest_dep for gtest)
-digital_clock_test = {
-    'name' : 'digital_clock_test',
-    'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
-    'sources' : [ 'tests/digital_clock_test.c' ]
-}
-
 digital_clock_gtest = {
     'name' : 'digital_clock_gtest',
     'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
@@ -54,18 +48,16 @@ digital_clock_gtest = {
     'deps' : [gtest_dep]
 }
 
-# Build error:
-# repeat_until_x.c:111:37: error: ‘None’ undeclared (first use in this function)
-# 111 |   red_100x70_motion_sety2.op_code = None;
-# repeat_until_x_test = {
-#     'scratch_program' : meson.project_source_root() / 'repeat_until_x.sb3',
-#     'sources' : [ 'tests/repeat_until_x_test.c' ]
-# }
+variables_gtest = {
+    'name' : 'variables_gtest',
+    'scratch_program' : meson.project_source_root() / 'variables.sb3',
+    'sources' : [ 'tests/variables_gtest.cpp' ],
+    'deps' : [gtest_dep]
+}
 
 gen_tests = [
-    digital_clock_test,
     digital_clock_gtest,
-    #repeat_until_x_test
+    variables_gtest,
 ]
 
 scratch_gens = {}

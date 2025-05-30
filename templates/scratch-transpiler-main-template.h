@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-void Scratch_Init();
+void Scratch_Init(void);
 
 typedef struct ScratchVariable {
   float number_value;
@@ -17,3 +17,4 @@ ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* varia
 #ifdef __cplusplus
 }
 #endif
+
