@@ -71,17 +71,17 @@ void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
 }
 
 ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1, ScratchVariable* variable2) {
-  ScratchVariable result;
-
   char* s1 = Scratch_ReadStringVariable(variable1);
   char* s2 = Scratch_ReadStringVariable(variable2);
   size_t size1 = strlen(s1);
   size_t size2 = strlen(s2);
   
   char* new_string = malloc(size1 + size2 + 1);
-  strcpy(s1, new_string);
-  strcpy(s2, new_string + size1);
+  strcpy(new_string, s1);
+  strcpy(new_string + size1, s2);
 
+  ScratchVariable result;
+  Scratch_InitVariable(&result);
   Scratch_AssignStringVariable(&result, new_string);
 
   free(new_string);
@@ -225,7 +225,6 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
   
   ScratchVariable result = Scratch_JoinStringVariables(&num1, &num2);
-  Scratch_InitVariable(&result);
 
   Scratch_FreeVariable(&num1);
   Scratch_FreeVariable(&num2);
