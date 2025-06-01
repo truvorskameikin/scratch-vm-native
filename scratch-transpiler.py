@@ -30,29 +30,14 @@ def extract_sprite_name(scratch_target) -> SpriteName:
     return scratch_target["name"].replace(" ", "_")
 
 
-def extract_variable_name(scratch_json, scratch_target, scratch_variable_id):
-    if scratch_variable_id in scratch_target["variables"]:
-        return (
-            scratch_target,
-            extract_sprite_name(scratch_target)
-            + "_"
-            + scratch_target["variables"][scratch_variable_id][0].replace(" ", "_"),
-        )
-
-    scratch_stage_target = None
-    for scratch_target in scratch_json["targets"]:
-        if scratch_target["isStage"]:
-            scratch_stage_target = scratch_target
-            break
-
-    return extract_variable_name(
-        scratch_json, scratch_stage_target, scratch_variable_id
-    )
-
-
 class Variable:
-    def __init__(self, variable_name: str, value: str):
+    def __init__(
+        self, scratch_target: str, variable_name: str, value: str, scratch_variable_name
+    ):
+        self.scratch_target = scratch_target
         self.variable_name = variable_name
+        self.scratch_variable_name = scratch_variable_name
+        self.scratch_target_name = self.scratch_target["name"]
         try:
             self.value = float(value)
             self.is_string = False
@@ -67,20 +52,37 @@ class Variable:
         return f"Variable({self.variable_name}: {self.value})"
 
 
+def extract_variable(scratch_json, scratch_target, scratch_variable_id) -> Variable:
+    if scratch_variable_id in scratch_target["variables"]:
+        variable_value = scratch_target["variables"][scratch_variable_id][1]
+        scratch_variable_name = scratch_target["variables"][scratch_variable_id][0]
+        return Variable(
+            scratch_target,
+            extract_sprite_name(scratch_target)
+            + "_"
+            + scratch_variable_name.replace(" ", "_"),
+            variable_value,
+            scratch_variable_name,
+        )
+
+    scratch_stage_target = None
+    for scratch_target in scratch_json["targets"]:
+        if scratch_target["isStage"]:
+            scratch_stage_target = scratch_target
+            break
+
+    return extract_variable(scratch_json, scratch_stage_target, scratch_variable_id)
+
+
 def access_variable(
     scratch_json, scratch_target, scratch_variable_id, all_variables_and_cache
 ):
-    scratch_variable_target, variable_name = extract_variable_name(
-        scratch_json, scratch_target, scratch_variable_id
-    )
-    if variable_name in all_variables_and_cache["cache"]:
+    variable = extract_variable(scratch_json, scratch_target, scratch_variable_id)
+    if variable.variable_name in all_variables_and_cache["cache"]:
         return
 
-    variable_value = scratch_variable_target["variables"][scratch_variable_id][1]
-    variable = Variable(variable_name, variable_value)
-
     all_variables_and_cache["all_variables"].append(variable)
-    all_variables_and_cache["cache"][variable_name] = scratch_variable_id
+    all_variables_and_cache["cache"][variable.variable_name] = scratch_variable_id
 
 
 class Sprite:
@@ -155,10 +157,8 @@ def extract_inline_helpers_inputs_r(
                 )
 
                 helper = Helper(opcode, function_name)
-                _, variable_name = extract_variable_name(
-                    scratch_json, scratch_target, value[2]
-                )
-                helper.arguments = [variable_name]
+                variable = extract_variable(scratch_json, scratch_target, value[2])
+                helper.arguments = [variable.variable_name]
 
                 add_new_helper(helper, helpers, count_obj)
         else:
@@ -183,16 +183,14 @@ def extract_inline_helpers_r(
         )
 
         variable_id = scratch_block["fields"]["VARIABLE"][1]
-        _, variable_name = extract_variable_name(
-            scratch_json, scratch_target, variable_id
-        )
+        variable = extract_variable(scratch_json, scratch_target, variable_id)
 
         count = count_obj["count"]
         function_name = f"{extract_sprite_name(scratch_target)}_set_variable_{count}"
         helper = Helper("set_variable", function_name)
         if len(helpers) > 0:
             value_helper = helpers[-1]
-            helper.arguments = [value_helper.function_name, variable_name]
+            helper.arguments = [value_helper.function_name, variable.variable_name]
         add_new_helper(helper, helpers, count_obj)
 
     if opcode == "operator_mathop":

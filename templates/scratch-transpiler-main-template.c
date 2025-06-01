@@ -303,8 +303,11 @@ void Scratch_Init(void) {
 }
 
 ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name) {
-  (void) sprite_name;
-  (void) variable_name;
+{%- for variable in variables %}
+  if (strcmp("{{ variable.scratch_target_name }}", sprite_name) == 0 && strcmp("{{ variable.scratch_variable_name }}", variable_name) == 0) {
+    return &{{ variable.variable_name }};
+  }
+{%- endfor %}
   return 0;
 }
 
