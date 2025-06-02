@@ -35,17 +35,26 @@ typedef struct ScratchSprite {
 } ScratchSprite;
 
 void Scratch_InitVariable(ScratchVariable* variable) {
-  variable->str_value = 0;
   variable->number_value = 0;
+
+  variable->str_value = 0;
+  variable->is_const_str_value = 0;
+}
+
+void Scratch_InitNumberVariable(ScratchVariable* variable, float number_value) {
+  variable->number_value = number_value;
+  variable->str_value = 0;
 }
 
 void Scratch_AssignNumberVariable(ScratchVariable* variable, float number) {
+  variable->number_value = number;
+
   if (variable->str_value) {
-    free(variable->str_value);
+    if (!variable->is_const_str_value) {
+      free(variable->str_value);
+    }
     variable->str_value = 0;
   }
-
-  variable->number_value = number;
 }
 
 double Scratch_ReadNumberVariable(ScratchVariable* variable) {
@@ -59,15 +68,27 @@ char* Scratch_ReadStringVariable(ScratchVariable* variable) {
   return "";
 }
 
-void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
+void Scratch_InitStringVariable(ScratchVariable* variable, char* str, int is_const_str_value) {
+  variable->number_value = 0;
+  variable->str_value = str;
+  variable->is_const_str_value = is_const_str_value;
+}
+
+void Scratch_AssignStringVariable(ScratchVariable* variable, char* str) {
+  variable->number_value = 0;
+
   if (variable->str_value) {
-    free(variable->str_value);
+    if (!variable->is_const_str_value) {
+      free(variable->str_value);
+    }
     variable->str_value = 0;
   }
 
   size_t l = strlen(str);
   variable->str_value = malloc(l + 1);
   memcpy(variable->str_value, str, l + 1);
+
+  variable->is_const_str_value = 0;
 }
 
 ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1, ScratchVariable* variable2) {
@@ -81,10 +102,7 @@ ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1, ScratchV
   strcpy(new_string + size1, s2);
 
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignStringVariable(&result, new_string);
-
-  free(new_string);
+  Scratch_InitStringVariable(&result, new_string, /*is_const_str_value=*/ 0);
   
   return result;
 }
@@ -98,8 +116,12 @@ void Scratch_AssignVariable(ScratchVariable* variable, ScratchVariable* rhv) {
 }
 
 void Scratch_FreeVariable(ScratchVariable* variable) {
+  variable->number_value = 0;
+
   if (variable->str_value) {
-    free(variable->str_value);
+    if (!variable->is_const_str_value) {
+      free(variable->str_value);
+    }
     variable->str_value = 0;
   }
 }
@@ -131,8 +153,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignNumberVariable(&result, {{ helper.arguments[0] }});
+  Scratch_InitNumberVariable(&result, {{ helper.arguments[0] }});
   return result;
 }
 {%- endif %}
@@ -141,8 +162,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignStringVariable(&result, "{{ helper.arguments[0] }}");
+  Scratch_InitStringVariable(&result, "{{ helper.arguments[0] }}", /*is_const_str_value=*/ 1);
   return result;
 }
 {%- endif %}
@@ -174,8 +194,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
   
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num1) + Scratch_ReadNumberVariable(&num2));
+  Scratch_InitNumberVariable(&result, Scratch_ReadNumberVariable(&num1) + Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
   Scratch_FreeVariable(&num2);
@@ -191,8 +210,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
   
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num1) * Scratch_ReadNumberVariable(&num2));
+  Scratch_InitNumberVariable(&result, Scratch_ReadNumberVariable(&num1) * Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
   Scratch_FreeVariable(&num2);
@@ -208,8 +226,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
   
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignNumberVariable(&result, Scratch_ReadNumberVariable(&num1) / Scratch_ReadNumberVariable(&num2));
+  Scratch_InitNumberVariable(&result, Scratch_ReadNumberVariable(&num1) / Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
   Scratch_FreeVariable(&num2);
@@ -239,8 +256,7 @@ ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
   ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
   
   ScratchVariable result;
-  Scratch_InitVariable(&result);
-  Scratch_AssignNumberVariable(&result, sqrt(Scratch_ReadNumberVariable(&num)));
+  Scratch_InitNumberVariable(&result, sqrt(Scratch_ReadNumberVariable(&num)));
 
   Scratch_FreeVariable(&num);
 
