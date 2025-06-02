@@ -16,10 +16,14 @@ jobs:
       run: pip3 install --user meson
     - name: Install transpiler dependencies
       run: pip3 install --user jinja2
-    - name: Configure build
-      run: meson setup builddir
-    - name: Run tests
-      run: ninja -C builddir test
+    - name: Run tests with ASan
+      run: |
+        meson setup builddir_asan -Db_sanitize=address
+        ninja -C builddir_asan test
+    - name: Run tests with LSan
+      run: |
+        meson setup builddir_lsan -Db_sanitize=leak
+        ninja -C builddir_lsan test
 
   macos-tests:
     runs-on: macos-latest
@@ -36,7 +40,11 @@ jobs:
       run: pip3 install meson
     - name: Install transpiler dependencies
       run: pip3 install jinja2
-    - name: Configure build
-      run: meson setup builddir
-    - name: Run tests
-      run: ninja -C builddir test
+    - name: Run tests with ASan
+      run: |
+        meson setup builddir_asan -Db_sanitize=address
+        ninja -C builddir_asan test
+    - name: Run tests with LSan
+      run: |
+        meson setup builddir_lsan -Db_sanitize=leak
+        ninja -C builddir_lsan test
