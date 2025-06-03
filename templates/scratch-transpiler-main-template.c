@@ -84,9 +84,7 @@ void Scratch_AssignStringVariable(ScratchVariable* variable, char* str) {
     variable->str_value = 0;
   }
 
-  size_t l = strlen(str);
-  variable->str_value = malloc(l + 1);
-  memcpy(variable->str_value, str, l + 1);
+  variable->str_value = strdup(str);
 
   variable->is_const_str_value = 0;
 }
@@ -98,8 +96,8 @@ ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1, ScratchV
   size_t size2 = strlen(s2);
   
   char* new_string = malloc(size1 + size2 + 1);
-  strcpy(new_string, s1);
-  strcpy(new_string + size1, s2);
+  new_string = strcpy(new_string, s1);
+  new_string = strcat(new_string, s2);
 
   ScratchVariable result;
   Scratch_InitStringVariable(&result, new_string, /*is_const_str_value=*/ 0);
