@@ -3,15 +3,17 @@ project(
     'c',
     'cpp',
     version: '0.0.1',
-    meson_version: '>= 0.60',
+    meson_version: '>= 1.6.0',
     license: 'MIT',
     default_options: [
-        'c_std=gnu11',
+        'c_std=c17',
         'cpp_std=c++2a',
         'warning_level=3',
-        'werror=false'
+        'werror=true'
     ],
 )
+
+add_project_arguments(['-Wno-unused-function'], language: 'c')
 
 # gtest enable
 gtest = subproject('gtest')
