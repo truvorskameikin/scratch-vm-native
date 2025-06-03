@@ -2,6 +2,10 @@
 // Scratch Engine definitions
 // =====
 
+// All includes should be below these defines
+#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
