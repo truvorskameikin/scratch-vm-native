@@ -13,6 +13,8 @@ project(
     ],
 )
 
+add_project_arguments(['-Wno-unused-function'], language: 'c')
+
 # gtest enable
 gtest = subproject('gtest')
 gtest_dep = gtest.get_variable('gtest_main_dep')
