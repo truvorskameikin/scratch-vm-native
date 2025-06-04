@@ -1,14 +1,15 @@
-// Scratch Engine definitions
 #pragma once
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define ScratchNumber double
+
 void Scratch_Init(void);
 
 typedef struct ScratchVariable {
-  float number_value;
+  ScratchNumber number_value;
   char* str_value;
   int is_const_str_value;
 } ScratchVariable;

@@ -22,11 +22,7 @@ def read_scratch_program(file_path: str):
             return json.loads(project_file.read())
 
 
-class SpriteName(str):
-    pass
-
-
-def extract_sprite_name(scratch_target) -> SpriteName:
+def extract_sprite_name(scratch_target) -> str:
     return scratch_target["name"].replace(" ", "_")
 
 
@@ -83,19 +79,6 @@ def access_variable(
 
     all_variables_and_cache["all_variables"].append(variable)
     all_variables_and_cache["cache"][variable.variable_name] = scratch_variable_id
-
-
-class Sprite:
-    def __init__(self, sprite_name: SpriteName, is_stage: bool):
-        self.sprite_name = sprite_name
-        self.is_stage = is_stage
-
-
-def extract_sprites(scratch_json) -> dict[SpriteName, Sprite]:
-    result: dict[SpriteName, Sprite] = {}
-    for scratch_target in scratch_json["targets"]:
-        sprite_name = extract_sprite_name(scratch_target)
-        result[sprite_name] = Sprite(sprite_name, scratch_target["isStage"])
 
 
 class Helper:
@@ -356,7 +339,7 @@ def to_known_op_codes(scratch_op_code):
         return "kScratchControlWait"
 
 
-def extract_blocks_and_variables_r(
+def extract_targets_blocks_and_variables_r(
     scratch_json,
     scratch_target,
     helpers_count_obj,
@@ -390,7 +373,7 @@ def extract_blocks_and_variables_r(
                 block.block_name = f"{extract_sprite_name(scratch_target)}_Inplace{str(len(all_blocks))}"
                 all_blocks.append(block)
 
-                result = extract_blocks_and_variables_r(
+                result = extract_targets_blocks_and_variables_r(
                     scratch_json,
                     scratch_target,
                     helpers_count_obj,
@@ -413,7 +396,7 @@ def extract_blocks_and_variables_r(
 
                 if has_substack(scratch_cur_block):
                     substack_id = scratch_cur_block["inputs"]["SUBSTACK"][1]
-                    substack_result = extract_blocks_and_variables_r(
+                    substack_result = extract_targets_blocks_and_variables_r(
                         scratch_json,
                         scratch_target,
                         helpers_count_obj,
@@ -425,7 +408,7 @@ def extract_blocks_and_variables_r(
                     if substack_result:
                         block.substack_block_name = substack_result.block_name
 
-                result = extract_blocks_and_variables_r(
+                result = extract_targets_blocks_and_variables_r(
                     scratch_json,
                     scratch_target,
                     helpers_count_obj,
@@ -457,7 +440,8 @@ def extract_blocks_and_variables_r(
     return block
 
 
-def extract_blocks_and_variables(scratch_json):
+def extract_targets_blocks_and_variables(scratch_json):
+    all_targets = []
     all_blocks = []
     all_variables_and_cache = {"all_variables": [], "cache": {}}
     for scratch_target in scratch_json["targets"]:
@@ -468,7 +452,7 @@ def extract_blocks_and_variables(scratch_json):
 
         helpers_count_obj = {"count": 0}
         for scratch_top_level_block_id in top_level_block_ids:
-            extract_blocks_and_variables_r(
+            extract_targets_blocks_and_variables_r(
                 scratch_json,
                 scratch_target,
                 helpers_count_obj,
@@ -476,7 +460,7 @@ def extract_blocks_and_variables(scratch_json):
                 all_blocks,
                 all_variables_and_cache,
             )
-    return all_blocks, all_variables_and_cache["all_variables"]
+    return all_targets, all_blocks, all_variables_and_cache["all_variables"]
 
 
 def compile_scratch_program(scratch_json, output_stem: str):
@@ -493,15 +477,15 @@ def compile_scratch_program(scratch_json, output_stem: str):
             header_template = env.get_template("scratch-transpiler-main-template.h")
             header_file.write(header_template.render())
 
-            sprites = extract_sprites(scratch_json)
-            blocks, variables = extract_blocks_and_variables(scratch_json)
+            targets, blocks, variables = extract_targets_blocks_and_variables(scratch_json)
 
             c_template = env.get_template("scratch-transpiler-main-template.c")
             c_file.write(
                 c_template.render(
                     main_header_file=header_file_path,
-                    variables=variables,
+                    targets=targets,
                     blocks=blocks,
+                    variables=variables,
                 )
             )
 

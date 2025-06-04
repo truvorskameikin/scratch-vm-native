@@ -1,7 +1,3 @@
-// =====
-// Scratch Engine definitions
-// =====
-
 // All includes should be below these defines
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE
@@ -22,7 +18,7 @@ kScratchControlIf = 4,
 kScratchControlWait = 5,
 } ScratchOpCode;
 
-typedef void (*ImplaceBlockFunction)(struct ScratchSprite* sprite, float dt);
+typedef void (*ImplaceBlockFunction)(struct ScratchSprite* sprite, ScratchNumber dt);
 
 typedef struct ScratchBlock {
   struct ScratchBlock* next;
@@ -31,11 +27,19 @@ typedef struct ScratchBlock {
   ImplaceBlockFunction inplace_function;
 } ScratchBlock;
 
+typedef struct ControlWaitRuntime {
+  ScratchNumber currentWaitTime;
+  ScratchNumber timeout; 
+} ControlWaitRuntime;
+
+{%- for target in targets %}
+{%- endfor %}
+
 typedef struct ScratchSprite {
-  float x;
-  float y;
-  float direction_x;
-  float direction_y;
+  ScratchNumber x;
+  ScratchNumber y;
+  ScratchNumber direction_x;
+  ScratchNumber direction_y;
 } ScratchSprite;
 
 static inline void Scratch_InitVariable(ScratchVariable* variable) {
@@ -45,12 +49,12 @@ static inline void Scratch_InitVariable(ScratchVariable* variable) {
   variable->is_const_str_value = 0;
 }
 
-static inline void Scratch_InitNumberVariable(ScratchVariable* variable, float number_value) {
+static inline void Scratch_InitNumberVariable(ScratchVariable* variable, ScratchNumber number_value) {
   variable->number_value = number_value;
   variable->str_value = 0;
 }
 
-static inline void Scratch_AssignNumberVariable(ScratchVariable* variable, float number) {
+static inline void Scratch_AssignNumberVariable(ScratchVariable* variable, ScratchNumber number) {
   variable->number_value = number;
 
   if (variable->str_value) {
@@ -61,7 +65,7 @@ static inline void Scratch_AssignNumberVariable(ScratchVariable* variable, float
   }
 }
 
-static inline double Scratch_ReadNumberVariable(ScratchVariable* variable) {
+static inline ScratchNumber Scratch_ReadNumberVariable(ScratchVariable* variable) {
   return variable->number_value;
 }
 
@@ -151,7 +155,7 @@ static ScratchBlock {{ block.block_name }};
 // Inplace block helper:
 {%- for helper in helpers %}
 {%- if helper.op_code == "read_value_number" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
@@ -160,7 +164,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "read_value_string" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
@@ -169,7 +173,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "read_variable" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable result;
@@ -179,7 +183,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "set_variable" %}
-static inline void {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline void {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
@@ -189,7 +193,7 @@ static inline void {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
 }
 {%- endif %}
 {%- if helper.op_code == "operator_add" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
@@ -205,7 +209,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "operator_multiply" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
@@ -221,7 +225,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "operator_divide" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
@@ -237,7 +241,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "operator_join" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
@@ -252,7 +256,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 }
 {%- endif %}
 {%- if helper.op_code == "sqrt" %}
-static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, float dt) {
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
@@ -269,7 +273,7 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 {%- endfor %}
 // Make static inline after fixing test
 // Inplace block function:
-/*static inline*/ void {{ block.block_name }}_function(ScratchSprite* sprite, float dt) {
+/*static inline*/ void {{ block.block_name }}_function(ScratchSprite* sprite, ScratchNumber dt) {
 {%- for function in block.scratch_functions %}
   {{ function }}(sprite, dt);
 {%- endfor %}
@@ -279,9 +283,9 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 // =====
 // Scratch state and functions
 // =====
-static float current_time = 0.0f;
+static ScratchNumber current_time = 0.0f;
 
-static inline float Scratch_sensing_timer(struct ScratchSprite* sprite, float dt) {
+static inline ScratchNumber Scratch_sensing_timer(struct ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
   (void) dt;
   return current_time;
