@@ -34,10 +34,21 @@ typedef struct ScratchBlock {
   };
 } ScratchBlock;
 
-typedef struct ControlWaitRuntime {
+typedef struct ScratchControlWaitRuntime {
   ScratchNumber currentWaitTime;
-  ScratchNumber timeout; 
-} ControlWaitRuntime;
+  ScratchNumber timeout;
+} ScratchControlWaitRuntime;
+
+ScratchBlockFunctionResult Scratch_AdvanceControlWaitRuntime(ScratchNumber dt, ScratchControlWaitRuntime* runtime) {
+  runtime->currentWaitTime += dt;
+  if (runtime->currentWaitTime > runtime->timeout) {
+    runtime->currentWaitTime = runtime->timeout;
+  }
+  if (runtime->currentWaitTime == runtime->timeout) {
+    return kScratchBlockFunctionResultContinue;
+  }
+  return kScratchBlockFunctionResultWait;
+}
 
 static inline void Scratch_InitVariable(ScratchVariable* variable) {
   variable->number_value = 0;
@@ -349,9 +360,10 @@ void {{ block.block_name }}_function(ScratchNumber dt) {
 }
 {% else %}
 {% if block.op_code == "kScratchControlWait" %}
+// TODO(truvorskameikin): Move runtime block to target and clone.
+ScratchControlWaitRuntime {{ block.block_name }}_runtime;
 ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
-  (void) dt;
-  return kScratchBlockFunctionResultContinue;
+  return Scratch_AdvanceControlWaitRuntime(dt, &{{ block.block_name }}_runtime);
 }
 {% else %}
 ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
@@ -411,6 +423,11 @@ void Scratch_Init(void) {
 {% if block.op_code == "kScratchInPlace" %}
   {{ block.block_name }}.inplace_function = {{ block.block_name }}_function;
 {% else %}
+{% if block.op_code == "kScratchControlWait" %}
+  {{ block.block_name }}_runtime.currentWaitTime = 0;
+  // TODO(truvorskameikin): Calculate timeout using helpers.
+  {{ block.block_name }}_runtime.timeout = 1;
+{% endif %}
   {{ block.block_name }}.block_function = {{ block.block_name }}_function;
 {% endif %}
 {% endfor %}
