@@ -13,6 +13,11 @@ project(
     ],
 )
 
+if meson.get_compiler('cpp').get_id() == 'clang'
+    # libc++ uses other assertion mechanism
+    add_project_arguments(['-DNDEBUG', '-U_DEBUG'], language: 'cpp')
+endif
+
 add_project_arguments(['-Wno-unused-function'], language: 'c')
 
 # gtest enable

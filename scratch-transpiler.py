@@ -26,6 +26,21 @@ def extract_sprite_name(scratch_target) -> str:
     return scratch_target["name"].replace(" ", "_")
 
 
+class Target:
+    def __init__(self, sprite_name):
+        self.sprite_name = sprite_name
+        self.c_struct_name = f"{self.sprite_name}_t"
+        self.variable_name = self.sprite_name
+        self.clone_c_struct_name = f"{self.sprite_name}_Clone_t"
+        self.per_level_runtimes = []
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return f"Target({self.sprite_name}, {self.c_struct_name})"
+
+
 class Variable:
     def __init__(
         self, scratch_target: str, variable_name: str, value: str, scratch_variable_name
@@ -251,9 +266,12 @@ def extract_inline_helpers_r(
 
 
 class Block:
-    def __init__(self, op_code: str, is_top_level: bool):
+    def __init__(self, target: Target, op_code: str, is_top_level: bool, level):
+        self.target = target
         self.op_code = op_code
         self.is_top_level = is_top_level
+        self.level = level
+        self.max_level = 0
         self.scratch_inplace_blocks = []
         self.scratch_inplace_blocks_op_codes = []
         self.scratch_inplace_blocks_helpers = []
@@ -344,6 +362,8 @@ def extract_targets_blocks_and_variables_r(
     scratch_target,
     helpers_count_obj,
     scratch_block,
+    level,
+    all_targets,
     all_blocks,
     all_variables_and_cache,
 ):
@@ -362,7 +382,13 @@ def extract_targets_blocks_and_variables_r(
             inplace_blocks.append(scratch_cur_block)
         else:
             if len(inplace_blocks) > 0:
-                block = Block(kOpcodeRunInplace, scratch_cur_block["topLevel"])
+                block = Block(
+                    all_targets[-1],
+                    kOpcodeRunInplace,
+                    scratch_cur_block["topLevel"],
+                    level,
+                )
+                block.max_level = level
                 block.set_inplace_blocks(
                     scratch_json,
                     scratch_target,
@@ -370,7 +396,7 @@ def extract_targets_blocks_and_variables_r(
                     all_variables_and_cache,
                     inplace_blocks,
                 )
-                block.block_name = f"{extract_sprite_name(scratch_target)}_Inplace{str(len(all_blocks))}"
+                block.block_name = f"{extract_sprite_name(scratch_target)}_inplace{str(len(all_blocks))}"
                 all_blocks.append(block)
 
                 result = extract_targets_blocks_and_variables_r(
@@ -378,18 +404,27 @@ def extract_targets_blocks_and_variables_r(
                     scratch_target,
                     helpers_count_obj,
                     scratch_cur_block,
+                    level,
+                    all_targets,
                     all_blocks,
                     all_variables_and_cache,
                 )
                 if result is not None:
                     block.next_block_name = result.block_name
 
+                    max_level = max(block.max_level, result.max_level)
+                    block.max_level = max_level
+                    result.max_level = max_level
+
                 return block
             else:
                 block = Block(
+                    all_targets[-1],
                     to_known_op_codes(scratch_cur_block["opcode"]),
                     scratch_cur_block["topLevel"],
+                    level,
                 )
+                block.max_level = level
                 op_code = scratch_cur_block["opcode"]
                 block.block_name = f"{extract_sprite_name(scratch_target)}_{op_code}{str(len(all_blocks))}"
                 all_blocks.append(block)
@@ -401,6 +436,8 @@ def extract_targets_blocks_and_variables_r(
                         scratch_target,
                         helpers_count_obj,
                         scratch_target["blocks"][substack_id],
+                        level + 1,
+                        all_targets,
                         all_blocks,
                         all_variables_and_cache,
                     )
@@ -408,21 +445,34 @@ def extract_targets_blocks_and_variables_r(
                     if substack_result:
                         block.substack_block_name = substack_result.block_name
 
+                        max_level = max(block.max_level, substack_result.max_level)
+                        block.max_level = max_level
+                        substack_result.max_level = max_level
+
                 result = extract_targets_blocks_and_variables_r(
                     scratch_json,
                     scratch_target,
                     helpers_count_obj,
                     scratch_next_block,
+                    level,
+                    all_targets,
                     all_blocks,
                     all_variables_and_cache,
                 )
                 if result is not None:
                     block.next_block_name = result.block_name
 
+                    max_level = max(block.max_level, result.max_level)
+                    block.max_level = max_level
+                    result.max_level = max_level
+
                 return block
 
     if len(inplace_blocks) > 0:
-        block = Block(kOpcodeRunInplace, scratch_cur_block["topLevel"])
+        block = Block(
+            all_targets[-1], kOpcodeRunInplace, scratch_cur_block["topLevel"], level
+        )
+        block.max_level = level
         block.set_inplace_blocks(
             scratch_json,
             scratch_target,
@@ -431,7 +481,7 @@ def extract_targets_blocks_and_variables_r(
             inplace_blocks,
         )
         block.block_name = (
-            f"{extract_sprite_name(scratch_target)}_Inplace{str(len(all_blocks))}"
+            f"{extract_sprite_name(scratch_target)}_inplace{str(len(all_blocks))}"
         )
         all_blocks.append(block)
 
@@ -445,6 +495,10 @@ def extract_targets_blocks_and_variables(scratch_json):
     all_blocks = []
     all_variables_and_cache = {"all_variables": [], "cache": {}}
     for scratch_target in scratch_json["targets"]:
+        sprite_name = extract_sprite_name(scratch_target)
+        target = Target(sprite_name)
+        all_targets.append(target)
+
         top_level_block_ids = []
         for scratch_block_id, scratch_block in scratch_target["blocks"].items():
             if scratch_block["topLevel"]:
@@ -457,9 +511,12 @@ def extract_targets_blocks_and_variables(scratch_json):
                 scratch_target,
                 helpers_count_obj,
                 scratch_target["blocks"][scratch_top_level_block_id],
+                0,
+                all_targets,
                 all_blocks,
                 all_variables_and_cache,
             )
+
     return all_targets, all_blocks, all_variables_and_cache["all_variables"]
 
 
@@ -472,12 +529,20 @@ def compile_scratch_program(scratch_json, output_stem: str):
             env = Environment(
                 loader=PackageLoader("scratch-transpiler"),
                 autoescape=select_autoescape(),
+                trim_blocks=True,
+                lstrip_blocks=True,
             )
 
             header_template = env.get_template("scratch-transpiler-main-template.h")
             header_file.write(header_template.render())
 
-            targets, blocks, variables = extract_targets_blocks_and_variables(scratch_json)
+            targets, blocks, variables = extract_targets_blocks_and_variables(
+                scratch_json
+            )
+
+            when_flag_clicked_blocks = [
+                b for b in blocks if b.op_code == "kScratchWhenFlagClicked"
+            ]
 
             c_template = env.get_template("scratch-transpiler-main-template.c")
             c_file.write(
@@ -486,6 +551,7 @@ def compile_scratch_program(scratch_json, output_stem: str):
                     targets=targets,
                     blocks=blocks,
                     variables=variables,
+                    when_flag_clicked_blocks=when_flag_clicked_blocks,
                 )
             )
 

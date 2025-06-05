@@ -16,6 +16,8 @@ typedef struct ScratchVariable {
 
 ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name);
 
+void Scratch_Advance(ScratchNumber dt);
+
 #ifdef __cplusplus
 }
 #endif
