@@ -10,7 +10,7 @@ TEST(scratch_vm_variables_gtest, strings_init) {
   Scratch_InitStringVariable(&s2, "chicken", /*is_const_str_value=*/ 1);
 
   ScratchVariable s3;
-  Scratch_InitStringVariable(&s3, "banana", /*is_const_str_value=*/ 0);
+  Scratch_InitStringVariable(&s3, "banana", /*is_const_str_value=*/ 1);
 
   ScratchVariable s4;
   Scratch_InitVariable(&s4);

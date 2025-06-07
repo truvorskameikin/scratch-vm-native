@@ -51,13 +51,8 @@ const char* Scratch_ReadStringVariable(ScratchVariable* variable) {
 void Scratch_InitStringVariable(ScratchVariable* variable, const char* str, int is_const_str_value) {
   variable->number_value = 0;
 
-  if (is_const_str_value) {
-    variable->str_value = str;
-    variable->is_const_str_value = is_const_str_value;
-  } else {
-    variable->str_value = strdup(str);
-    variable->is_const_str_value = 0;
-  }
+  variable->str_value = str;
+  variable->is_const_str_value = is_const_str_value;
 }
 
 void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
