@@ -41,6 +41,11 @@ foreach module : required_modules
     endif
 endforeach
 
+scratch_vm_lib = static_library('scratch_vm_lib', ['templates/scratch-vm-variables.c'], c_args : '-DSCRATCH_VM_ALLOW_INCLUDES')
+
+scratch_vm_lib_tests_exe = executable('scratch_vm_lib_tests_exe', ['tests/scratch-vm-variables_gtest.cpp'], link_with : [scratch_vm_lib], dependencies : [gtest_dep])
+test('scratch_vm_lib_tests', scratch_vm_lib_tests_exe)
+
 # Describe the test using a dictionary with following fields:
 # - mandatory
 #   - name: binary and build target name

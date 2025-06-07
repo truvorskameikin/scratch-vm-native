@@ -6,7 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "{{ main_header_file }}"
+{% include 'scratch-vm-types.h' with context %}
+
+{% include 'scratch-vm-variables-public.h' with context %}
+
+{% include 'scratch-vm-variables.c' with context %}
 
 typedef enum ScratchOpCode {
 kScratchWhenFlagClicked = 1,
@@ -48,96 +52,6 @@ ScratchBlockFunctionResult Scratch_AdvanceControlWaitRuntime(ScratchNumber dt, S
     return kScratchBlockFunctionResultContinue;
   }
   return kScratchBlockFunctionResultWait;
-}
-
-static inline void Scratch_InitVariable(ScratchVariable* variable) {
-  variable->number_value = 0;
-
-  variable->str_value = 0;
-  variable->is_const_str_value = 0;
-}
-
-static inline void Scratch_InitNumberVariable(ScratchVariable* variable, ScratchNumber number_value) {
-  variable->number_value = number_value;
-  variable->str_value = 0;
-}
-
-static inline void Scratch_AssignNumberVariable(ScratchVariable* variable, ScratchNumber number) {
-  variable->number_value = number;
-
-  if (variable->str_value) {
-    if (!variable->is_const_str_value) {
-      free(variable->str_value);
-    }
-    variable->str_value = 0;
-  }
-}
-
-static inline ScratchNumber Scratch_ReadNumberVariable(ScratchVariable* variable) {
-  return variable->number_value;
-}
-
-static inline char* Scratch_ReadStringVariable(ScratchVariable* variable) {
-  if (variable->str_value) {
-    return variable->str_value;
-  }
-  return "";
-}
-
-static inline void Scratch_InitStringVariable(ScratchVariable* variable, char* str, int is_const_str_value) {
-  variable->number_value = 0;
-  variable->str_value = str;
-  variable->is_const_str_value = is_const_str_value;
-}
-
-static inline void Scratch_AssignStringVariable(ScratchVariable* variable, char* str) {
-  variable->number_value = 0;
-
-  if (variable->str_value) {
-    if (!variable->is_const_str_value) {
-      free(variable->str_value);
-    }
-    variable->str_value = 0;
-  }
-
-  variable->str_value = strdup(str);
-
-  variable->is_const_str_value = 0;
-}
-
-static inline ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1, ScratchVariable* variable2) {
-  char* s1 = Scratch_ReadStringVariable(variable1);
-  char* s2 = Scratch_ReadStringVariable(variable2);
-  size_t size1 = strlen(s1);
-  size_t size2 = strlen(s2);
-  
-  char* new_string = malloc(size1 + size2 + 1);
-  new_string = strcpy(new_string, s1);
-  new_string = strcat(new_string, s2);
-
-  ScratchVariable result;
-  Scratch_InitStringVariable(&result, new_string, /*is_const_str_value=*/ 0);
-  
-  return result;
-}
-
-static inline void Scratch_AssignVariable(ScratchVariable* variable, ScratchVariable* rhv) {
-  if (rhv->str_value) {
-    Scratch_AssignStringVariable(variable, rhv->str_value);
-  } else {
-    Scratch_AssignNumberVariable(variable, rhv->number_value);
-  }
-}
-
-static inline void Scratch_FreeVariable(ScratchVariable* variable) {
-  variable->number_value = 0;
-
-  if (variable->str_value) {
-    if (!variable->is_const_str_value) {
-      free(variable->str_value);
-    }
-    variable->str_value = 0;
-  }
 }
 
 void Scratch_AdvanceSingleProgram(ScratchNumber dt, ScratchBlock* stack[], int* cur_stack_index, int is_in_sub_stack) {

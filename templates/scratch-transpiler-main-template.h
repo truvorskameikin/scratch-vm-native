@@ -1,24 +1,19 @@
 #pragma once
 
+{% include 'scratch-vm-types.h' with context %}
+
+{% include 'scratch-vm-variables-public.h' with context %}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define ScratchNumber double
-
 void Scratch_Init(void);
-
-typedef struct ScratchVariable {
-  ScratchNumber number_value;
-  char* str_value;
-  int is_const_str_value;
-} ScratchVariable;
-
-ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name);
-
 void Scratch_Advance(ScratchNumber dt);
 
 #ifdef __cplusplus
 }
 #endif
+
+// Need two new lines in the end.
 
