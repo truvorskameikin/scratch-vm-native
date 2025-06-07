@@ -2,7 +2,7 @@
 
 #include "templates/scratch-vm-variables-internal.h"
 
-TEST(scratch_vm_variables_gtest, strings_init) {
+TEST(scratch_vm_variables_gtest, strings) {
   ScratchVariable s1;
   Scratch_InitVariable(&s1);
 
