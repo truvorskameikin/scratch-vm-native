@@ -1,3 +1,7 @@
+// All includes should be below these defines
+#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE
+
 #if defined(SCRATCH_VM_ALLOW_INCLUDES)
 #include "scratch-vm-types.h"
 #include "scratch-vm-variables-public.h"
