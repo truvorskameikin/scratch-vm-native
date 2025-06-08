@@ -115,9 +115,7 @@ def add_new_helper(helper, helpers, helpers_count_obj):
     helpers_count_obj["count"] = helpers_count_obj["count"] + 1
 
 
-def extract_inline_helpers_inputs_r(
-    scratch_json, scratch_target, input_obj, helpers, count_obj
-):
+def extract_inputs_r(scratch_json, scratch_target, input_obj, helpers, count_obj):
     value_input_type = input_obj[0]
     value = input_obj[1]
 
@@ -172,7 +170,7 @@ def extract_inline_helpers_r(
 ):
     opcode = scratch_block["opcode"]
     if opcode == "data_setvariableto":
-        extract_inline_helpers_inputs_r(
+        extract_inputs_r(
             scratch_json,
             scratch_target,
             scratch_block["inputs"]["VALUE"],
@@ -192,7 +190,7 @@ def extract_inline_helpers_r(
         add_new_helper(helper, helpers, count_obj)
 
     if opcode == "operator_mathop":
-        extract_inline_helpers_inputs_r(
+        extract_inputs_r(
             scratch_json,
             scratch_target,
             scratch_block["inputs"]["NUM"],
@@ -215,7 +213,7 @@ def extract_inline_helpers_r(
         or opcode == "operator_add"
         or opcode == "operator_multiply"
     ):
-        extract_inline_helpers_inputs_r(
+        extract_inputs_r(
             scratch_json,
             scratch_target,
             scratch_block["inputs"]["NUM1"],
@@ -224,7 +222,7 @@ def extract_inline_helpers_r(
         )
         num1_helper = helpers[-1]
 
-        extract_inline_helpers_inputs_r(
+        extract_inputs_r(
             scratch_json,
             scratch_target,
             scratch_block["inputs"]["NUM2"],
@@ -240,7 +238,7 @@ def extract_inline_helpers_r(
         add_new_helper(helper, helpers, count_obj)
 
     if opcode == "operator_join":
-        extract_inline_helpers_inputs_r(
+        extract_inputs_r(
             scratch_json,
             scratch_target,
             scratch_block["inputs"]["STRING1"],
@@ -249,7 +247,7 @@ def extract_inline_helpers_r(
         )
         num1_helper = helpers[-1]
 
-        extract_inline_helpers_inputs_r(
+        extract_inputs_r(
             scratch_json,
             scratch_target,
             scratch_block["inputs"]["STRING2"],
@@ -274,7 +272,7 @@ class Block:
         self.max_level = 0
         self.scratch_inplace_blocks = []
         self.scratch_inplace_blocks_op_codes = []
-        self.scratch_inplace_blocks_helpers = []
+        self.scratch_input_helpers = []
         self.scratch_functions = []
         self.block_name = ""
         self.next_block_name = ""
@@ -308,7 +306,7 @@ class Block:
                 helpers,
                 helpers_count_obj,
             )
-            self.scratch_inplace_blocks_helpers.append(helpers)
+            self.scratch_input_helpers.append(helpers)
             self.scratch_functions.append(helpers[-1].function_name)
 
     def __repr__(self):
@@ -418,9 +416,10 @@ def extract_targets_blocks_and_variables_r(
 
                 return block
             else:
+                known_op_code = to_known_op_codes(scratch_cur_block["opcode"])
                 block = Block(
                     all_targets[-1],
-                    to_known_op_codes(scratch_cur_block["opcode"]),
+                    known_op_code,
                     scratch_cur_block["topLevel"],
                     level,
                 )
@@ -428,6 +427,19 @@ def extract_targets_blocks_and_variables_r(
                 op_code = scratch_cur_block["opcode"]
                 block.block_name = f"{extract_sprite_name(scratch_target)}_{op_code}{str(len(all_blocks))}"
                 all_blocks.append(block)
+
+                helpers = []
+                if known_op_code == "kScratchControlWait":
+                    extract_inputs_r(
+                        scratch_json,
+                        scratch_target,
+                        scratch_cur_block["inputs"]["DURATION"],
+                        helpers,
+                        helpers_count_obj,
+                    )
+                block.scratch_input_helpers.append(helpers)
+                if len(helpers) > 0:
+                    block.scratch_functions.append(helpers[-1].function_name)
 
                 if has_substack(scratch_cur_block):
                     substack_id = scratch_cur_block["inputs"]["SUBSTACK"][1]

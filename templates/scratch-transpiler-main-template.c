@@ -145,8 +145,7 @@ void Scratch_Advance_{{ block.block_name }}_program(ScratchNumber dt) {
 // Inplace blocks functions
 // =====
 {% for block in blocks %}
-{% if block.op_code == "kScratchInPlace" %}
-{% for helpers in block.scratch_inplace_blocks_helpers %}
+{% for helpers in block.scratch_input_helpers %}
 // Inplace block helper:
 {% for helper in helpers %}
 {% if helper.op_code == "read_value_number" %}
@@ -266,17 +265,20 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
 {% endif %}
 {% endfor %}
 {% endfor %}
+{% if block.op_code == "kScratchInPlace" %}
 // Will not be inlined because pointer to this function will be used as inline block function.
 void {{ block.block_name }}_function(ScratchNumber dt) {
 {% for function in block.scratch_functions %}
   {{ function }}((ScratchSprite*) &{{ block.target.variable_name }}, dt);
 {% endfor %}
 }
-{% else %}
-{% if block.op_code == "kScratchControlWait" %}
+{% elif block.op_code == "kScratchControlWait" %}
 // TODO(truvorskameikin): Move runtime block to target and clone.
 ScratchControlWaitRuntime {{ block.block_name }}_runtime;
 ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
+  ScratchVariable duration = {{ block.scratch_functions[0] }}((ScratchSprite*) &{{ block.target.variable_name }}, dt);
+  {{ block.block_name }}_runtime.timeout = Scratch_ReadNumberVariable(&duration);
+  Scratch_FreeVariable(&duration);
   return Scratch_AdvanceControlWaitRuntime(dt, &{{ block.block_name }}_runtime);
 }
 {% else %}
@@ -284,7 +286,6 @@ ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
   (void) dt;
   return kScratchBlockFunctionResultContinue;
 }
-{% endif %}
 {% endif %}
 {% endfor %}
 
@@ -339,8 +340,7 @@ void Scratch_Init(void) {
 {% else %}
 {% if block.op_code == "kScratchControlWait" %}
   {{ block.block_name }}_runtime.currentWaitTime = 0;
-  // TODO(truvorskameikin): Calculate timeout using helpers.
-  {{ block.block_name }}_runtime.timeout = 1;
+  {{ block.block_name }}_runtime.timeout = 0;
 {% endif %}
   {{ block.block_name }}.block_function = {{ block.block_name }}_function;
 {% endif %}
