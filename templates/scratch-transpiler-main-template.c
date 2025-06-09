@@ -12,6 +12,17 @@
 
 {% include 'scratch-vm-variables.c' with context %}
 
+{% set sprite_base %}
+  ScratchNumber x;
+  ScratchNumber y;
+  ScratchNumber direction_x;
+  ScratchNumber direction_y;
+{%- endset %}
+
+typedef struct ScratchSprite {
+{{ sprite_base }}
+} ScratchSprite;
+
 typedef enum ScratchOpCode {
 kScratchWhenFlagClicked = 1,
 kScratchInPlace = 2,
@@ -27,6 +38,7 @@ kScratchBlockFunctionResultWait = 2,
 
 typedef void (*ImplaceBlockFunction)(ScratchNumber dt);
 typedef ScratchBlockFunctionResult (*BlockFunction)(ScratchNumber dt);
+typedef ScratchVariable (*ExpressionFunction)(ScratchSprite* sprite, ScratchNumber dt);
 
 typedef struct ScratchBlock {
   struct ScratchBlock* next;
@@ -39,16 +51,31 @@ typedef struct ScratchBlock {
 } ScratchBlock;
 
 typedef struct ScratchControlWaitRuntime {
+  int is_running;
   ScratchNumber currentWaitTime;
   ScratchNumber timeout;
 } ScratchControlWaitRuntime;
 
-ScratchBlockFunctionResult Scratch_AdvanceControlWaitRuntime(ScratchNumber dt, ScratchControlWaitRuntime* runtime) {
+ScratchBlockFunctionResult Scratch_AdvanceControlWaitRuntime(
+    ScratchNumber dt,
+    ScratchSprite* sprite,
+    ExpressionFunction duration_expression,
+    ScratchControlWaitRuntime* runtime) {
+  
+  if (!runtime->is_running) {
+    ScratchVariable duration = duration_expression(sprite, dt);
+    runtime->timeout = Scratch_ReadNumberVariable(&duration);
+    Scratch_FreeVariable(&duration);
+
+    runtime->is_running = 1;
+  }
+
   runtime->currentWaitTime += dt;
   if (runtime->currentWaitTime > runtime->timeout) {
     runtime->currentWaitTime = runtime->timeout;
   }
   if (runtime->currentWaitTime == runtime->timeout) {
+    runtime->is_running = 0;
     return kScratchBlockFunctionResultContinue;
   }
   return kScratchBlockFunctionResultWait;
@@ -84,17 +111,6 @@ void Scratch_AdvanceSingleProgram(ScratchNumber dt, ScratchBlock* stack[], int* 
   stack[*cur_stack_index] = stack[*cur_stack_index]->next;
   Scratch_AdvanceSingleProgram(dt, stack, cur_stack_index, is_in_sub_stack);
 }
-
-{% set sprite_base %}
-  ScratchNumber x;
-  ScratchNumber y;
-  ScratchNumber direction_x;
-  ScratchNumber direction_y;
-{%- endset %}
-
-typedef struct ScratchSprite {
-{{ sprite_base }}
-} ScratchSprite;
 
 // =====
 // Targets
@@ -276,10 +292,11 @@ void {{ block.block_name }}_function(ScratchNumber dt) {
 // TODO(truvorskameikin): Move runtime block to target and clone.
 ScratchControlWaitRuntime {{ block.block_name }}_runtime;
 ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
-  ScratchVariable duration = {{ block.scratch_functions[0] }}((ScratchSprite*) &{{ block.target.variable_name }}, dt);
-  {{ block.block_name }}_runtime.timeout = Scratch_ReadNumberVariable(&duration);
-  Scratch_FreeVariable(&duration);
-  return Scratch_AdvanceControlWaitRuntime(dt, &{{ block.block_name }}_runtime);
+  return Scratch_AdvanceControlWaitRuntime(
+      dt,
+      (ScratchSprite*) &{{ block.target.variable_name }},
+      {{ block.scratch_input_helpers[0][-1].function_name }},
+      &{{ block.block_name }}_runtime);
 }
 {% else %}
 ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
@@ -339,6 +356,7 @@ void Scratch_Init(void) {
   {{ block.block_name }}.inplace_function = {{ block.block_name }}_function;
 {% else %}
 {% if block.op_code == "kScratchControlWait" %}
+  {{ block.block_name }}_runtime.is_running = 0;
   {{ block.block_name }}_runtime.currentWaitTime = 0;
   {{ block.block_name }}_runtime.timeout = 0;
 {% endif %}

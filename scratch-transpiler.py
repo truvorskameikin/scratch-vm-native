@@ -438,8 +438,6 @@ def extract_targets_blocks_and_variables_r(
                         helpers_count_obj,
                     )
                 block.scratch_input_helpers.append(helpers)
-                if len(helpers) > 0:
-                    block.scratch_functions.append(helpers[-1].function_name)
 
                 if has_substack(scratch_cur_block):
                     substack_id = scratch_cur_block["inputs"]["SUBSTACK"][1]
