@@ -9,7 +9,7 @@ project(
         'c_std=c17',
         'cpp_std=c++2a',
         'warning_level=3',
-        'werror=true'
+        'werror=true',
     ],
 )
 
@@ -25,14 +25,15 @@ gtest = subproject('gtest')
 gtest_dep = gtest.get_variable('gtest_main_dep')
 
 if 'sdl' in get_option('frontend')
-sdl2 = subproject(
-    'sdl2',
-    default_options: [
-        'warning_level=0',
-        'werror=false',
-        'test=false',
-        'use_audio=disabled' # TODO: temporarily disabled
-        ])
+    sdl2 = subproject(
+        'sdl2',
+        default_options: [
+            'warning_level=0',
+            'werror=false',
+            'test=false',
+            'use_audio=disabled',  # TODO: temporarily disabled
+        ],
+    )
 endif
 
 # subdirs
@@ -43,21 +44,39 @@ inc = include_directories('.')
 
 python = find_program('python3')
 
-vscode = find_program('codium', 'code', '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code', required : false)
+vscode = find_program(
+    'codium',
+    'code',
+    '/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code',
+    required: false,
+)
 
 # Required Python packages
 required_modules = ['jinja2']
 
 foreach module : required_modules
-    res = run_command([python, '-c', 'import ' + module], capture: false, check: false)
+    res = run_command(
+        [python, '-c', 'import ' + module],
+        capture: false,
+        check: false,
+    )
     if res.returncode() != 0
         error('Python module `' + module + '` is not found')
     endif
 endforeach
 
-scratch_vm_lib = static_library('scratch_vm_lib', ['templates/scratch-vm-variables.c'], c_args : '-DSCRATCH_VM_ALLOW_INCLUDES')
+scratch_vm_lib = static_library(
+    'scratch_vm_lib',
+    ['templates/scratch-vm-variables.c'],
+    c_args: '-DSCRATCH_VM_ALLOW_INCLUDES',
+)
 
-scratch_vm_lib_tests_exe = executable('scratch_vm_lib_tests_exe', ['tests/scratch-vm-variables_gtest.cpp'], link_with : [scratch_vm_lib], dependencies : [gtest_dep])
+scratch_vm_lib_tests_exe = executable(
+    'scratch_vm_lib_tests_exe',
+    ['tests/scratch-vm-variables_gtest.cpp'],
+    link_with: [scratch_vm_lib],
+    dependencies: [gtest_dep],
+)
 test('scratch_vm_lib_tests', scratch_vm_lib_tests_exe)
 
 # Describe the binary using a dictionary with following fields:
@@ -71,22 +90,22 @@ test('scratch_vm_lib_tests', scratch_vm_lib_tests_exe)
 digital_clock_gtest = {
     'name' : 'digital_clock_gtest',
     'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
-    'sources' : [ 'tests/digital_clock_gtest.cpp' ],
-    'deps' : [gtest_dep]
+    'sources' : ['tests/digital_clock_gtest.cpp'],
+    'deps' : [gtest_dep],
 }
 
 variables_gtest = {
     'name' : 'variables_gtest',
     'scratch_program' : meson.project_source_root() / 'variables.sb3',
-    'sources' : [ 'tests/variables_gtest.cpp' ],
-    'deps' : [gtest_dep]
+    'sources' : ['tests/variables_gtest.cpp'],
+    'deps' : [gtest_dep],
 }
 
 variables_sdl = {
     'name' : 'variables_sdl',
     'scratch_program' : meson.project_source_root() / 'variables.sb3',
     'deps' : [sdl_frontend_dep],
-    'enabled': 'sdl' in get_option('frontend')
+    'enabled': 'sdl' in get_option('frontend'),
 }
 
 gen_targets = [
@@ -114,17 +133,24 @@ foreach target : gen_targets
     if not scratch_gens.has_key(sb_prog)
         gen = custom_target(
             'gen_' + base_name,
-            command: [python, meson.project_source_root() / 'scratch-transpiler.py', '-i', sb_prog, '-o', base_name],
+            command: [
+                python,
+                meson.project_source_root() / 'scratch-transpiler.py',
+                '-i',
+                sb_prog,
+                '-o',
+                base_name,
+            ],
             input: sb_prog,
             output: [base_name + '.c', base_name + '.h'],
             # Regenerate if script or templates changed
             depend_files: [
                 meson.project_source_root() / 'scratch-transpiler.py',
                 'templates/scratch-transpiler-main-template.c',
-                'templates/scratch-transpiler-main-template.h'
-            ]
+                'templates/scratch-transpiler-main-template.h',
+            ],
         )
-        scratch_gens = scratch_gens + { sb_prog : gen }
+        scratch_gens = scratch_gens + {sb_prog: gen}
     endif
 
     gen_exe = executable(
@@ -140,13 +166,26 @@ foreach target : gen_targets
     endif
 
     # update launch.json on configure
-    meson.add_postconf_script(python, meson.project_source_root() / 'scripts' / 'update_launchjson.py', exe_name, gen_exe.full_path())
+    meson.add_postconf_script(
+        python,
+        meson.project_source_root() / 'scripts' / 'update_launchjson.py',
+        exe_name,
+        gen_exe.full_path(),
+    )
 
     # Add run command
     run_target(exe_name + '_run', command: [gen_exe], depends: [gen_exe])
 
     # Run debugger in vscode (CodeLLDB plugin required)
     if vscode.found()
-        run_target(exe_name + '_dbg', command: [vscode, '--open-url', 'vscode://vadimcn.vscode-lldb/launch?name=' + exe_name], depends: [gen_exe])
+        run_target(
+            exe_name + '_dbg',
+            command: [
+                vscode,
+                '--open-url',
+                'vscode://vadimcn.vscode-lldb/launch?name=' + exe_name,
+            ],
+            depends: [gen_exe],
+        )
     endif
 endforeach
