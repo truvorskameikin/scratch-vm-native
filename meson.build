@@ -24,6 +24,20 @@ add_project_arguments(['-Wno-unused-function'], language: 'c')
 gtest = subproject('gtest')
 gtest_dep = gtest.get_variable('gtest_main_dep')
 
+if 'sdl' in get_option('frontend')
+sdl2 = subproject(
+    'sdl2',
+    default_options: [
+        'warning_level=0',
+        'werror=false',
+        'test=false',
+        'use_audio=disabled' # TODO: temporarily disabled
+        ])
+endif
+
+# subdirs
+subdir('frontend')
+
 fs = import('fs')
 inc = include_directories('.')
 
@@ -46,13 +60,14 @@ scratch_vm_lib = static_library('scratch_vm_lib', ['templates/scratch-vm-variabl
 scratch_vm_lib_tests_exe = executable('scratch_vm_lib_tests_exe', ['tests/scratch-vm-variables_gtest.cpp'], link_with : [scratch_vm_lib], dependencies : [gtest_dep])
 test('scratch_vm_lib_tests', scratch_vm_lib_tests_exe)
 
-# Describe the test using a dictionary with following fields:
+# Describe the binary using a dictionary with following fields:
 # - mandatory
 #   - name: binary and build target name
 #   - scratch_program: the full path to the translated Scratch program.
-#   - sources: any additional source files required for building the test binary.
 # - optional
+#   - sources: any additional source files required for building the test binary.
 #   - deps: list of dependencies to test (e.g. gtest_dep for gtest)
+#   - enabled: true/false, true by default
 digital_clock_gtest = {
     'name' : 'digital_clock_gtest',
     'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
@@ -67,19 +82,31 @@ variables_gtest = {
     'deps' : [gtest_dep]
 }
 
-gen_tests = [
+variables_sdl = {
+    'name' : 'variables_sdl',
+    'scratch_program' : meson.project_source_root() / 'variables.sb3',
+    'deps' : [sdl_frontend_dep],
+    'enabled': 'sdl' in get_option('frontend')
+}
+
+gen_targets = [
     # TODO(truvorskameikin): Re-enable after fixing.
     # digital_clock_gtest,
     variables_gtest,
+    variables_sdl,
 ]
 
 scratch_gens = {}
 
-foreach test_target : gen_tests
-    exe_name = test_target['name']
-    sb_prog = test_target['scratch_program']
-    bin_sources = test_target['sources']
-    deps = test_target.get('deps', [])
+foreach target : gen_targets
+    if not target.get('enabled', true)
+        continue
+    endif
+
+    exe_name = target['name']
+    sb_prog = target['scratch_program']
+    bin_sources = target.get('sources', [])
+    deps = target.get('deps', [])
 
     base_name = fs.replace_suffix(fs.name(sb_prog), '')
     message('Generate: ' + exe_name)
@@ -108,7 +135,9 @@ foreach test_target : gen_tests
     )
 
     # Add the test to meson test list
-    test(exe_name, gen_exe)
+    if exe_name.contains('test')
+        test(exe_name, gen_exe)
+    endif
 
     # update launch.json on configure
     meson.add_postconf_script(python, meson.project_source_root() / 'scripts' / 'update_launchjson.py', exe_name, gen_exe.full_path())
