@@ -1,11 +1,9 @@
+#if !defined(__SCRATCH_VM_INSIDE_TEMPLATE__)
 // All includes should be below these defines
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE
 
-#if defined(SCRATCH_VM_ALLOW_INCLUDES)
-#include "scratch-vm-types.h"
-#include "scratch-vm-variables-public.h"
-#include "scratch-vm-variables-internal.h"
+#include "scratch-vm-variable.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -18,14 +16,16 @@ void Scratch_InitVariable(ScratchVariable* variable) {
   variable->is_const_str_value = 0;
 }
 
-void Scratch_InitNumberVariable(ScratchVariable* variable, ScratchNumber number_value) {
+void Scratch_InitNumberVariable(ScratchVariable* variable,
+                                ScratchNumber number_value) {
   variable->number_value = number_value;
 
   variable->str_value = 0;
   variable->is_const_str_value = 0;
 }
 
-void Scratch_AssignNumberVariable(ScratchVariable* variable, ScratchNumber number) {
+void Scratch_AssignNumberVariable(ScratchVariable* variable,
+                                  ScratchNumber number) {
   variable->number_value = number;
 
   if (variable->str_value) {
@@ -48,7 +48,8 @@ const char* Scratch_ReadStringVariable(ScratchVariable* variable) {
   return "";
 }
 
-void Scratch_InitStringVariable(ScratchVariable* variable, const char* str, int is_const_str_value) {
+void Scratch_InitStringVariable(ScratchVariable* variable, const char* str,
+                                int is_const_str_value) {
   variable->number_value = 0;
 
   variable->str_value = str;
@@ -69,19 +70,20 @@ void Scratch_AssignStringVariable(ScratchVariable* variable, const char* str) {
   variable->is_const_str_value = 0;
 }
 
-ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1, ScratchVariable* variable2) {
+ScratchVariable Scratch_JoinStringVariables(ScratchVariable* variable1,
+                                            ScratchVariable* variable2) {
   const char* s1 = Scratch_ReadStringVariable(variable1);
   const char* s2 = Scratch_ReadStringVariable(variable2);
   size_t size1 = strlen(s1);
   size_t size2 = strlen(s2);
-  
+
   char* new_string = malloc(size1 + size2 + 1);
   new_string = strcpy(new_string, s1);
   new_string = strcat(new_string, s2);
 
   ScratchVariable result;
-  Scratch_InitStringVariable(&result, new_string, /*is_const_str_value=*/ 0);
-  
+  Scratch_InitStringVariable(&result, new_string, /*is_const_str_value=*/0);
+
   return result;
 }
 

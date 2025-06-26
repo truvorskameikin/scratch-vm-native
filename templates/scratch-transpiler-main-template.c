@@ -2,59 +2,70 @@
 #define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE
 
+#define __SCRATCH_VM_INSIDE_TEMPLATE__
+
+#include <assert.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
-{% include 'scratch-vm-types.h' with context %}
+{% include 'scratch-vm-types.h' without context %}
 
-{% include 'scratch-vm-variables-public.h' with context %}
+{% include 'scratch-vm-memory.h' without context %}
 
-{% include 'scratch-vm-variables.c' with context %}
+{% include 'scratch-vm-buffered-linked-list.h' without context %}
+
+{% include 'scratch-vm-variable-types.h' without context %}
+
+{% include 'scratch-vm-variable.h' without context %}
+
+{% include 'scratch-vm-sprite-types.h' without context %}
+
+{% include 'scratch-vm-sprite.h' without context %}
+
+{% include 'scratch-vm-block.h' without context %}
+
+{% include 'scratch-vm-program.h' without context %}
+
+{% include 'scratch-vm-memory.c' without context %}
+
+{% include 'scratch-vm-buffered-linked-list.c' without context %}
+
+{% include 'scratch-vm-variable.c' without context %}
+
+{% include 'scratch-vm-sprite.c' without context %}
+
+{% include 'scratch-vm-program.c' without context %}
 
 {% set sprite_base %}
   ScratchNumber x;
   ScratchNumber y;
-  ScratchNumber direction_x;
-  ScratchNumber direction_y;
 {%- endset %}
 
-typedef struct ScratchSprite {
-{{ sprite_base }}
-} ScratchSprite;
-
-typedef enum ScratchOpCode {
-kScratchWhenFlagClicked = 1,
-kScratchInPlace = 2,
-kScratchControlForever = 3,
-kScratchControlIf = 4,
-kScratchControlWait = 5,
-} ScratchOpCode;
-
-typedef enum ScratchBlockFunctionResult {
-kScratchBlockFunctionResultContinue = 1,
-kScratchBlockFunctionResultWait = 2,
-} ScratchBlockFunctionResult;
-
-typedef void (*ImplaceBlockFunction)(ScratchNumber dt);
-typedef ScratchBlockFunctionResult (*BlockFunction)(ScratchNumber dt);
 typedef ScratchVariable (*ExpressionFunction)(ScratchSprite* sprite, ScratchNumber dt);
 
-typedef struct ScratchBlock {
-  struct ScratchBlock* next;
-  struct ScratchBlock* substack;
-  ScratchOpCode op_code;
-  union {
-    ImplaceBlockFunction inplace_function;
-    BlockFunction block_function;
-  };
-} ScratchBlock;
+{% set runtime_base %}
+  long current_iteration;
+{%- endset %}
+
+typedef struct BlockRuntime {
+{{ runtime_base }}
+} BlockRuntime;
 
 typedef struct ScratchControlWaitRuntime {
+{{ runtime_base }}
   int is_running;
   ScratchNumber currentWaitTime;
   ScratchNumber timeout;
 } ScratchControlWaitRuntime;
+
+{%- macro to_runtime(block) -%}
+{% if block.op_code == "kScratchControlIf" %}
+ScratchControlWaitRuntime
+{%- else -%}
+BlockRuntime
+{%- endif %}
+{%- endmacro %}
 
 ScratchBlockFunctionResult Scratch_AdvanceControlWaitRuntime(
     ScratchNumber dt,
@@ -76,9 +87,25 @@ ScratchBlockFunctionResult Scratch_AdvanceControlWaitRuntime(
   }
   if (runtime->currentWaitTime == runtime->timeout) {
     runtime->is_running = 0;
-    return kScratchBlockFunctionResultContinue;
+    return kScratchBlockFunctionResultDone;
   }
   return kScratchBlockFunctionResultWait;
+}
+
+// =====
+// Scratch state and functions
+// =====
+static ScratchNumber current_time = 0.0f;
+static long current_iteration = 0;
+
+static inline ScratchVariable Scratch_sensing_timer(ScratchSprite* sprite, ScratchNumber dt) {
+  (void) sprite;
+  (void) dt;
+
+  ScratchVariable result;
+  Scratch_InitNumberVariable(&result, current_time);
+
+  return result;
 }
 
 void Scratch_AdvanceSingleProgram(ScratchNumber dt, ScratchBlock* stack[], int* cur_stack_index, int is_in_sub_stack) {
@@ -102,9 +129,30 @@ void Scratch_AdvanceSingleProgram(ScratchNumber dt, ScratchBlock* stack[], int* 
   if (cur_block->op_code == kScratchInPlace) {
     cur_block->inplace_function(dt);
   } else {
-    ScratchBlockFunctionResult result = cur_block->block_function(dt);
+    ScratchBlockFunctionResult result = cur_block->block_function(/*runtime=*/ 0, dt);
     if (result == kScratchBlockFunctionResultWait) {
+      if (cur_block->substack) {
+        *cur_stack_index += 1;
+        stack[*cur_stack_index] = cur_block->substack;
+
+        Scratch_AdvanceSingleProgram(dt, stack, cur_stack_index, /*is_in_sub_stack=*/ 1);
+      }
+
       return;
+    } else if (result == kScratchBlockFunctionResultDoneGoToSubstack) {
+      if (cur_block->substack) {
+        *cur_stack_index += 1;
+        stack[*cur_stack_index] = cur_block->substack;
+
+        Scratch_AdvanceSingleProgram(dt, stack, cur_stack_index, /*is_in_sub_stack=*/ 0);
+      }
+    } else if (result == kScratchBlockFunctionResultDoneGoToSubstackAlt) {
+      if (cur_block->substack_alt) {
+        *cur_stack_index += 1;
+        stack[*cur_stack_index] = cur_block->substack_alt;
+
+        Scratch_AdvanceSingleProgram(dt, stack, cur_stack_index, /*is_in_sub_stack=*/ 0);
+      }
     }
   }
 
@@ -157,12 +205,50 @@ void Scratch_Advance_{{ block.block_name }}_program(ScratchNumber dt) {
 }
 {% endfor %}
 
+typedef struct StackEntry {
+  ScratchBlock* cur_block;
+  void* runtime;
+} StackEntry;
+
+{% set program_base %}
+  int is_running;
+  StackEntry* stack;
+  int cur_stack_index;
+{%- endset %}
+
+typedef struct Program {
+{{ program_base }}
+} Program;
+
+{% for program in programs %}
+typedef struct {{ program.top_level_block.block_name }}_prg_t {
+{{ program_base }}
+  StackEntry stack_data[{{ program.top_level_block.max_level + 1 }}];
+{% for level in program.blocks_per_level %}
+  union {
+{% for block in level %}
+    {{ to_runtime(block) }} {{ block.short_name }}_runtime;
+{% endfor %}
+  } runtime{{ loop.index0 }};
+{% endfor %}
+} {{ program.top_level_block.block_name }}_prg_t;
+
+void {{ program.top_level_block.block_name }}_prg_init({{ program.top_level_block.block_name }}_prg_t* program) {
+  program->is_running = 0;
+  program->cur_stack_index = 0;
+  program->stack = &program->stack_data[0];
+{% for level in program.blocks_per_level %}
+  program->stack[{{ loop.index0 }}].cur_block = 0;
+  program->stack[{{ loop.index0 }}].runtime = &program->runtime{{ loop.index0 }};
+{% endfor %}
+}
+{% endfor %}
+
 // =====
 // Inplace blocks functions
 // =====
 {% for block in blocks %}
 {% for helpers in block.scratch_input_helpers %}
-// Inplace block helper:
 {% for helper in helpers %}
 {% if helper.op_code == "read_value_number" %}
 static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
@@ -192,16 +278,6 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
   return result;
 }
 {% endif %}
-{% if helper.op_code == "set_variable" %}
-static inline void {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
-  (void) sprite;
-  (void) dt;
-  ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
-  Scratch_AssignVariable(&{{ helper.arguments[1] }}, &num);
-
-  Scratch_FreeVariable(&num);
-}
-{% endif %}
 {% if helper.op_code == "operator_add" %}
 static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
@@ -211,6 +287,22 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
   
   ScratchVariable result;
   Scratch_InitNumberVariable(&result, Scratch_ReadNumberVariable(&num1) + Scratch_ReadNumberVariable(&num2));
+  
+  Scratch_FreeVariable(&num1);
+  Scratch_FreeVariable(&num2);
+  
+  return result;
+}
+{% endif %}
+{% if helper.op_code == "operator_subtract" %}
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
+  (void) sprite;
+  (void) dt;
+  ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
+  ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
+  
+  ScratchVariable result;
+  Scratch_InitNumberVariable(&result, Scratch_ReadNumberVariable(&num1) - Scratch_ReadNumberVariable(&num2));
   
   Scratch_FreeVariable(&num1);
   Scratch_FreeVariable(&num2);
@@ -250,6 +342,26 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
   return result;
 }
 {% endif %}
+{% if helper.op_code == "operator_gt" %}
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
+  (void) sprite;
+  (void) dt;
+  ScratchVariable num1 = {{ helper.arguments[0] }}(sprite, dt);
+  ScratchVariable num2 = {{ helper.arguments[1] }}(sprite, dt);
+  
+  ScratchVariable result;
+  if (Scratch_ReadNumberVariable(&num1) > Scratch_ReadNumberVariable(&num2)) {
+    Scratch_InitNumberVariable(&result, 1);
+  } else {
+    Scratch_InitNumberVariable(&result, 0);
+  }
+  
+  Scratch_FreeVariable(&num1);
+  Scratch_FreeVariable(&num2);
+  
+  return result;
+}
+{% endif %}
 {% if helper.op_code == "operator_join" %}
 static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
   (void) sprite;
@@ -279,6 +391,30 @@ static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, 
   return result;
 }
 {% endif %}
+{% if helper.op_code == "operator_round" %}
+static inline ScratchVariable {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
+  (void) sprite;
+  (void) dt;
+  ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
+  
+  ScratchVariable result;
+  Scratch_InitNumberVariable(&result, round(Scratch_ReadNumberVariable(&num)));
+
+  Scratch_FreeVariable(&num);
+
+  return result;
+}
+{% endif %}
+{% if helper.op_code == "set_variable" %}
+static inline void {{ helper.function_name }}(ScratchSprite* sprite, ScratchNumber dt) {
+  (void) sprite;
+  (void) dt;
+  ScratchVariable num = {{ helper.arguments[0] }}(sprite, dt);
+  Scratch_AssignVariable(&{{ helper.arguments[1] }}, &num);
+
+  Scratch_FreeVariable(&num);
+}
+{% endif %}
 {% endfor %}
 {% endfor %}
 {% if block.op_code == "kScratchInPlace" %}
@@ -291,31 +427,40 @@ void {{ block.block_name }}_function(ScratchNumber dt) {
 {% elif block.op_code == "kScratchControlWait" %}
 // TODO(truvorskameikin): Move runtime block to target and clone.
 ScratchControlWaitRuntime {{ block.block_name }}_runtime;
-ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
+ScratchBlockFunctionResult {{ block.block_name }}_function(void* runtime, ScratchNumber dt) {
+  (void) runtime;
   return Scratch_AdvanceControlWaitRuntime(
       dt,
       (ScratchSprite*) &{{ block.target.variable_name }},
       {{ block.scratch_input_helpers[0][-1].function_name }},
       &{{ block.block_name }}_runtime);
 }
-{% else %}
-ScratchBlockFunctionResult {{ block.block_name }}_function(ScratchNumber dt) {
+{% elif block.op_code == "kScratchControlForever" %}
+ScratchBlockFunctionResult {{ block.block_name }}_function(void* runtime, ScratchNumber dt) {
+  (void) runtime;
   (void) dt;
-  return kScratchBlockFunctionResultContinue;
+  return kScratchBlockFunctionResultWait;
+}
+{% elif block.op_code == "kScratchControlIf" %}
+ScratchBlockFunctionResult {{ block.block_name }}_function(void* runtime, ScratchNumber dt) {
+  (void) runtime;
+  ScratchVariable condition = {{ block.scratch_input_helpers[0][-1].function_name }}(
+      (ScratchSprite*) &{{ block.target.variable_name }},
+      dt);
+  if (Scratch_ReadNumberVariable(&condition) == 1) {
+    return kScratchBlockFunctionResultDoneGoToSubstack;
+  } else {
+    return kScratchBlockFunctionResultDoneGoToSubstackAlt;
+  }
+}
+{% else %}
+ScratchBlockFunctionResult {{ block.block_name }}_function(void* runtime, ScratchNumber dt) {
+  (void) runtime;
+  (void) dt;
+  return kScratchBlockFunctionResultDone;
 }
 {% endif %}
 {% endfor %}
-
-// =====
-// Scratch state and functions
-// =====
-static ScratchNumber current_time = 0.0f;
-
-static inline ScratchNumber Scratch_sensing_timer(struct ScratchSprite* sprite, ScratchNumber dt) {
-  (void) sprite;
-  (void) dt;
-  return current_time;
-}
 
 // =====
 // Init
@@ -334,8 +479,6 @@ void Scratch_Init(void) {
 {% for target in targets %}
   {{target.variable_name}}.x = 0;
   {{target.variable_name}}.y = 0;
-  {{target.variable_name}}.direction_x = 0;
-  {{target.variable_name}}.direction_y = 0;
   {{target.variable_name}}.clones = 0;
 {% endfor %}
 
@@ -351,6 +494,11 @@ void Scratch_Init(void) {
   {{ block.block_name }}.substack = &{{ block.substack_block_name }};
 {% else %}
   {{ block.block_name }}.substack = 0;
+{% endif %}
+{% if block.substack_alt_block_name %}
+  {{ block.block_name }}.substack_alt = &{{ block.substack_alt_block_name }};
+{% else %}
+  {{ block.block_name }}.substack_alt = 0;
 {% endif %}
 {% if block.op_code == "kScratchInPlace" %}
   {{ block.block_name }}.inplace_function = {{ block.block_name }}_function;
@@ -370,6 +518,24 @@ void Scratch_Init(void) {
 {% endfor %}
 }
 
+void Scratch_Advance(ScratchNumber dt) {
+  current_time += dt;
+  ++current_iteration;
+{% for block in when_flag_clicked_blocks %}
+  Scratch_Advance_{{ block.block_name }}_program(dt);
+{% endfor %}
+}
+
+void Scratch_AdvanceSteps(ScratchNumber dt, ScratchNumber fps) {
+  ScratchNumber one_second = 1;
+  ScratchNumber step_length = one_second / fps;
+  while (dt > step_length) {
+    Scratch_Advance(step_length);
+    dt -= step_length;
+  }
+  Scratch_Advance(dt);
+}
+
 ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* variable_name) {
 {% for variable in variables %}
   if (strcmp("{{ variable.scratch_target_name }}", sprite_name) == 0 && strcmp("{{ variable.scratch_variable_name }}", variable_name) == 0) {
@@ -377,12 +543,6 @@ ScratchVariable* Scratch_FindVariable(const char* sprite_name, const char* varia
   }
 {% endfor %}
   return 0;
-}
-
-void Scratch_Advance(ScratchNumber dt) {
-{% for block in when_flag_clicked_blocks %}
-  Scratch_Advance_{{ block.block_name }}_program(dt);
-{% endfor %}
 }
 
 // Need two new lines in the end.

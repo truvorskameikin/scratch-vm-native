@@ -1,16 +1,16 @@
 #include <gtest/gtest.h>
 
-#include "templates/scratch-vm-variables-internal.h"
+#include "templates/scratch-vm-variable.h"
 
-TEST(scratch_vm_variables_gtest, strings) {
+TEST(scratch_vm_variable_gtest, strings) {
   ScratchVariable s1;
   Scratch_InitVariable(&s1);
 
   ScratchVariable s2;
-  Scratch_InitStringVariable(&s2, "chicken", /*is_const_str_value=*/ 1);
+  Scratch_InitStringVariable(&s2, "chicken", /*is_const_str_value=*/1);
 
   ScratchVariable s3;
-  Scratch_InitStringVariable(&s3, "banana", /*is_const_str_value=*/ 1);
+  Scratch_InitStringVariable(&s3, "banana", /*is_const_str_value=*/1);
 
   ScratchVariable s4;
   Scratch_InitVariable(&s4);
