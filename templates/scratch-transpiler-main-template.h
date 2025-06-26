@@ -1,8 +1,12 @@
 #pragma once
 
-{% include 'scratch-vm-types.h' with context %}
+#define __SCRATCH_VM_INSIDE_TEMPLATE__
 
-{% include 'scratch-vm-variables-public.h' with context %}
+{% include 'scratch-vm-types.h' without context %}
+
+{% include 'scratch-vm-variable-types.h' without context %}
+
+{% include 'scratch-vm-sprite-types.h' without context %}
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +14,10 @@ extern "C" {
 
 void Scratch_Init(void);
 void Scratch_Advance(ScratchNumber dt);
+void Scratch_AdvanceSteps(ScratchNumber dt, ScratchNumber fps);
+
+ScratchVariable* Scratch_FindVariable(const char* sprite_name,
+                                      const char* variable_name);
 
 #ifdef __cplusplus
 }

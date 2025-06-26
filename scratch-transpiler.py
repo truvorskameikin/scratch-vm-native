@@ -22,23 +22,23 @@ def read_scratch_program(file_path: str):
             return json.loads(project_file.read())
 
 
-def extract_sprite_name(scratch_target) -> str:
+def extract_target_name(scratch_target) -> str:
     return scratch_target["name"].replace(" ", "_")
 
 
 class Target:
-    def __init__(self, sprite_name):
-        self.sprite_name = sprite_name
-        self.c_struct_name = f"{self.sprite_name}_t"
-        self.variable_name = self.sprite_name
-        self.clone_c_struct_name = f"{self.sprite_name}_Clone_t"
+    def __init__(self, target_name):
+        self.target_name = target_name
+        self.c_struct_name = f"{self.target_name}_t"
+        self.variable_name = self.target_name
+        self.clone_c_struct_name = f"{self.target_name}_Clone_t"
         self.per_level_runtimes = []
 
     def __repr__(self):
         return self.__str__()
 
     def __str__(self):
-        return f"Target({self.sprite_name}, {self.c_struct_name})"
+        return f"Target({self.target_name}, {self.c_struct_name})"
 
 
 class Variable:
@@ -69,7 +69,7 @@ def extract_variable(scratch_json, scratch_target, scratch_variable_id) -> Varia
         scratch_variable_name = scratch_target["variables"][scratch_variable_id][0]
         return Variable(
             scratch_target,
-            extract_sprite_name(scratch_target)
+            extract_target_name(scratch_target)
             + "_"
             + scratch_variable_name.replace(" ", "_"),
             variable_value,
@@ -116,59 +116,171 @@ def add_new_helper(helper, helpers, helpers_count_obj):
 
 
 def extract_inputs_r(scratch_json, scratch_target, input_obj, helpers, count_obj):
-    value_input_type = input_obj[0]
-    value = input_obj[1]
+    if isinstance(input_obj, list):
+        value_input_type = input_obj[0]
+        value = input_obj[1]
 
-    # Shadow
-    if value_input_type == 1:
-        # value is array [type, value]. 4, 5, 6, 7 - integer values; 8 - angle; 9 - color; 10 - string (can be converted to int)
+        # Shadow
+        if value_input_type == 1:
+            # value is array [type, value]. 4, 5, 6, 7 - integer values; 8 - angle; 9 - color; 10 - string (can be converted to int)
 
-        count = count_obj["count"]
+            count = count_obj["count"]
 
-        opcode = "read_value_string"
-        if value[0] in (4, 5, 6, 7):
-            opcode = "read_value_number"
-        if value[0] == 10:
-            try:
-                float(value[1])
+            opcode = "read_value_string"
+            if value[0] in (4, 5, 6, 7):
                 opcode = "read_value_number"
-            except:
-                opcode = "read_value_string"
+            if value[0] == 10:
+                try:
+                    float(value[1])
+                    opcode = "read_value_number"
+                except:
+                    opcode = "read_value_string"
 
-        function_name = f"{extract_sprite_name(scratch_target)}_{opcode}_helper_{count}"
-        helper = Helper(opcode, function_name)
+            function_name = (
+                f"{extract_target_name(scratch_target)}_{opcode}_helper_{count}"
+            )
+            helper = Helper(opcode, function_name)
 
-        helper.arguments = [value[1]]
+            helper.arguments = [value[1]]
 
-        add_new_helper(helper, helpers, count_obj)
+            add_new_helper(helper, helpers, count_obj)
 
-    if value_input_type == 3:
-        if isinstance(value, list):
-            # Variable
-            if value[0] == 12:
-                count = count_obj["count"]
-                opcode = "read_variable"
-                function_name = (
-                    f"{extract_sprite_name(scratch_target)}_{opcode}_helper_{count}"
+        if value_input_type == 2 or value_input_type == 3:
+            if isinstance(value, list):
+                # Variable
+                if value[0] == 12:
+                    count = count_obj["count"]
+                    opcode = "read_variable"
+                    function_name = (
+                        f"{extract_target_name(scratch_target)}_{opcode}_helper_{count}"
+                    )
+
+                    helper = Helper(opcode, function_name)
+                    variable = extract_variable(scratch_json, scratch_target, value[2])
+                    helper.arguments = [variable.variable_name]
+
+                    add_new_helper(helper, helpers, count_obj)
+            else:
+                # value is input ID
+                next_block = scratch_target["blocks"][value]
+                extract_inputs_r(
+                    scratch_json, scratch_target, next_block, helpers, count_obj
                 )
 
-                helper = Helper(opcode, function_name)
-                variable = extract_variable(scratch_json, scratch_target, value[2])
-                helper.arguments = [variable.variable_name]
+    if isinstance(input_obj, dict):
+        scratch_block = input_obj
 
-                add_new_helper(helper, helpers, count_obj)
-        else:
-            # value is input ID
-            next_block = scratch_target["blocks"][value]
-            extract_inline_helpers_r(
-                scratch_json, scratch_target, next_block, helpers, count_obj
+        opcode = scratch_block["opcode"]
+        if opcode == "operator_mathop":
+            extract_inputs_r(
+                scratch_json,
+                scratch_target,
+                scratch_block["inputs"]["NUM"],
+                helpers,
+                count_obj,
             )
 
+            num_helper = helpers[-1]
 
-def extract_inline_helpers_r(
+            operator = scratch_block["fields"]["OPERATOR"][0]
+
+            count = count_obj["count"]
+            function_name = f"{extract_target_name(scratch_target)}_{operator}_{count}"
+            helper = Helper(operator, function_name)
+            helper.arguments = [num_helper.function_name]
+            add_new_helper(helper, helpers, count_obj)
+
+        if opcode == "operator_round":
+            extract_inputs_r(
+                scratch_json,
+                scratch_target,
+                scratch_block["inputs"]["NUM"],
+                helpers,
+                count_obj,
+            )
+
+            num_helper = helpers[-1]
+
+            count = count_obj["count"]
+            function_name = f"{extract_target_name(scratch_target)}_{opcode}_{count}"
+            helper = Helper(opcode, function_name)
+            helper.arguments = [num_helper.function_name]
+            add_new_helper(helper, helpers, count_obj)
+
+        if opcode == "sensing_timer":
+            function_name = f"Scratch_sensing_timer"
+            add_new_helper(Helper(opcode, function_name), helpers, count_obj)
+
+        if (
+            opcode == "operator_divide"
+            or opcode == "operator_multiply"
+            or opcode == "operator_add"
+            or opcode == "operator_subtract"
+            or opcode == "operator_gt"
+        ):
+            operand1_name = "NUM1"
+            if opcode == "operator_gt":
+                operand1_name = "OPERAND1"
+
+            extract_inputs_r(
+                scratch_json,
+                scratch_target,
+                scratch_block["inputs"][operand1_name],
+                helpers,
+                count_obj,
+            )
+            num1_helper = helpers[-1]
+
+            operand2_name = "NUM2"
+            if opcode == "operator_gt":
+                operand2_name = "OPERAND2"
+
+            extract_inputs_r(
+                scratch_json,
+                scratch_target,
+                scratch_block["inputs"][operand2_name],
+                helpers,
+                count_obj,
+            )
+            num2_helper = helpers[-1]
+
+            count = count_obj["count"]
+            function_name = f"{extract_target_name(scratch_target)}_{opcode}_{count}"
+            helper = Helper(opcode, function_name)
+            helper.arguments = [num1_helper.function_name, num2_helper.function_name]
+            add_new_helper(helper, helpers, count_obj)
+
+        if opcode == "operator_join":
+            extract_inputs_r(
+                scratch_json,
+                scratch_target,
+                scratch_block["inputs"]["STRING1"],
+                helpers,
+                count_obj,
+            )
+            num1_helper = helpers[-1]
+
+            extract_inputs_r(
+                scratch_json,
+                scratch_target,
+                scratch_block["inputs"]["STRING2"],
+                helpers,
+                count_obj,
+            )
+            num2_helper = helpers[-1]
+
+            count = count_obj["count"]
+            function_name = f"{extract_target_name(scratch_target)}_{opcode}_{count}"
+            helper = Helper(opcode, function_name)
+            helper.arguments = [num1_helper.function_name, num2_helper.function_name]
+            add_new_helper(helper, helpers, count_obj)
+
+
+def extract_inline_helpers(
     scratch_json, scratch_target, scratch_block, helpers, count_obj
 ):
     opcode = scratch_block["opcode"]
+
     if opcode == "data_setvariableto":
         extract_inputs_r(
             scratch_json,
@@ -182,84 +294,11 @@ def extract_inline_helpers_r(
         variable = extract_variable(scratch_json, scratch_target, variable_id)
 
         count = count_obj["count"]
-        function_name = f"{extract_sprite_name(scratch_target)}_set_variable_{count}"
+        function_name = f"{extract_target_name(scratch_target)}_set_variable_{count}"
         helper = Helper("set_variable", function_name)
         if len(helpers) > 0:
             value_helper = helpers[-1]
             helper.arguments = [value_helper.function_name, variable.variable_name]
-        add_new_helper(helper, helpers, count_obj)
-
-    if opcode == "operator_mathop":
-        extract_inputs_r(
-            scratch_json,
-            scratch_target,
-            scratch_block["inputs"]["NUM"],
-            helpers,
-            count_obj,
-        )
-
-        num_helper = helpers[-1]
-
-        operator = scratch_block["fields"]["OPERATOR"][0]
-
-        count = count_obj["count"]
-        function_name = f"{extract_sprite_name(scratch_target)}_{operator}_{count}"
-        helper = Helper(operator, function_name)
-        helper.arguments = [num_helper.function_name]
-        add_new_helper(helper, helpers, count_obj)
-
-    if (
-        opcode == "operator_divide"
-        or opcode == "operator_add"
-        or opcode == "operator_multiply"
-    ):
-        extract_inputs_r(
-            scratch_json,
-            scratch_target,
-            scratch_block["inputs"]["NUM1"],
-            helpers,
-            count_obj,
-        )
-        num1_helper = helpers[-1]
-
-        extract_inputs_r(
-            scratch_json,
-            scratch_target,
-            scratch_block["inputs"]["NUM2"],
-            helpers,
-            count_obj,
-        )
-        num2_helper = helpers[-1]
-
-        count = count_obj["count"]
-        function_name = f"{extract_sprite_name(scratch_target)}_{opcode}_{count}"
-        helper = Helper(opcode, function_name)
-        helper.arguments = [num1_helper.function_name, num2_helper.function_name]
-        add_new_helper(helper, helpers, count_obj)
-
-    if opcode == "operator_join":
-        extract_inputs_r(
-            scratch_json,
-            scratch_target,
-            scratch_block["inputs"]["STRING1"],
-            helpers,
-            count_obj,
-        )
-        num1_helper = helpers[-1]
-
-        extract_inputs_r(
-            scratch_json,
-            scratch_target,
-            scratch_block["inputs"]["STRING2"],
-            helpers,
-            count_obj,
-        )
-        num2_helper = helpers[-1]
-
-        count = count_obj["count"]
-        function_name = f"{extract_sprite_name(scratch_target)}_{opcode}_{count}"
-        helper = Helper(opcode, function_name)
-        helper.arguments = [num1_helper.function_name, num2_helper.function_name]
         add_new_helper(helper, helpers, count_obj)
 
 
@@ -274,6 +313,7 @@ class Block:
         self.scratch_inplace_blocks_op_codes = []
         self.scratch_input_helpers = []
         self.scratch_functions = []
+        self.short_name = ""
         self.block_name = ""
         self.next_block_name = ""
         self.substack_block_name = ""
@@ -299,7 +339,7 @@ class Block:
                 )
 
             helpers = []
-            extract_inline_helpers_r(
+            extract_inline_helpers(
                 scratch_json,
                 scratch_target,
                 b,
@@ -321,6 +361,21 @@ class Block:
         if self.substack_block_name:
             substack = f" Substack: {self.substack_block_name}"
         return f"Block({self.block_name}{inplace_blocks}{substack} -> {self.next_block_name})"
+
+
+class Program:
+    def __init__(self, target, top_level_block, program_blocks):
+        self.target = target
+        self.top_level_block = top_level_block
+        self.program_blocks = program_blocks
+
+        levels = set()
+        for block in self.program_blocks:
+            levels.add(block.level)
+
+        self.blocks_per_level = [[] for _ in range(max(levels) + 1)]
+        for block in self.program_blocks:
+            self.blocks_per_level[block.level].append(block)
 
 
 def can_run_inplace(scratch_block) -> bool:
@@ -394,7 +449,10 @@ def extract_targets_blocks_and_variables_r(
                     all_variables_and_cache,
                     inplace_blocks,
                 )
-                block.block_name = f"{extract_sprite_name(scratch_target)}_inplace{str(len(all_blocks))}"
+                block.short_name = f"inplace{str(len(all_blocks))}"
+                block.block_name = (
+                    f"{extract_target_name(scratch_target)}_{block.short_name}"
+                )
                 all_blocks.append(block)
 
                 result = extract_targets_blocks_and_variables_r(
@@ -425,15 +483,25 @@ def extract_targets_blocks_and_variables_r(
                 )
                 block.max_level = level
                 op_code = scratch_cur_block["opcode"]
-                block.block_name = f"{extract_sprite_name(scratch_target)}_{op_code}{str(len(all_blocks))}"
+                block.short_name = f"{op_code}{str(len(all_blocks))}"
+                block.block_name = (
+                    f"{extract_target_name(scratch_target)}_{block.short_name}"
+                )
                 all_blocks.append(block)
 
                 helpers = []
-                if known_op_code == "kScratchControlWait":
+                if (
+                    known_op_code == "kScratchControlWait"
+                    or known_op_code == "kScratchControlIf"
+                ):
+                    input_name = "DURATION"
+                    if known_op_code == "kScratchControlIf":
+                        input_name = "CONDITION"
+
                     extract_inputs_r(
                         scratch_json,
                         scratch_target,
-                        scratch_cur_block["inputs"]["DURATION"],
+                        scratch_cur_block["inputs"][input_name],
                         helpers,
                         helpers_count_obj,
                     )
@@ -490,9 +558,8 @@ def extract_targets_blocks_and_variables_r(
             all_variables_and_cache,
             inplace_blocks,
         )
-        block.block_name = (
-            f"{extract_sprite_name(scratch_target)}_inplace{str(len(all_blocks))}"
-        )
+        block.short_name = f"inplace{str(len(all_blocks))}"
+        block.block_name = f"{extract_target_name(scratch_target)}_{block.short_name}"
         all_blocks.append(block)
 
         return block
@@ -504,9 +571,10 @@ def extract_targets_blocks_and_variables(scratch_json):
     all_targets = []
     all_blocks = []
     all_variables_and_cache = {"all_variables": [], "cache": {}}
+    all_programs = []
     for scratch_target in scratch_json["targets"]:
-        sprite_name = extract_sprite_name(scratch_target)
-        target = Target(sprite_name)
+        target_name = extract_target_name(scratch_target)
+        target = Target(target_name)
         all_targets.append(target)
 
         top_level_block_ids = []
@@ -516,6 +584,7 @@ def extract_targets_blocks_and_variables(scratch_json):
 
         helpers_count_obj = {"count": 0}
         for scratch_top_level_block_id in top_level_block_ids:
+            l = len(all_blocks)
             extract_targets_blocks_and_variables_r(
                 scratch_json,
                 scratch_target,
@@ -527,7 +596,16 @@ def extract_targets_blocks_and_variables(scratch_json):
                 all_variables_and_cache,
             )
 
-    return all_targets, all_blocks, all_variables_and_cache["all_variables"]
+            program_blocks = all_blocks[l:]
+            program = Program(target, program_blocks[0], program_blocks)
+            all_programs.append(program)
+
+    return (
+        all_targets,
+        all_blocks,
+        all_variables_and_cache["all_variables"],
+        all_programs,
+    )
 
 
 def compile_scratch_program(scratch_json, output_stem: str):
@@ -546,7 +624,7 @@ def compile_scratch_program(scratch_json, output_stem: str):
             header_template = env.get_template("scratch-transpiler-main-template.h")
             header_file.write(header_template.render())
 
-            targets, blocks, variables = extract_targets_blocks_and_variables(
+            targets, blocks, variables, programs = extract_targets_blocks_and_variables(
                 scratch_json
             )
 
@@ -561,6 +639,7 @@ def compile_scratch_program(scratch_json, output_stem: str):
                     targets=targets,
                     blocks=blocks,
                     variables=variables,
+                    programs=programs,
                     when_flag_clicked_blocks=when_flag_clicked_blocks,
                 )
             )

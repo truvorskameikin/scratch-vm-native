@@ -1,5 +1,5 @@
-#ifndef SCRATCH_VM_INCLUDE_TYPES_H_
-#define SCRATCH_VM_INCLUDE_TYPES_H_
+#ifndef __SCRATCH_VM_INCLUDE_TYPES_H__
+#define __SCRATCH_VM_INCLUDE_TYPES_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,8 +7,13 @@ extern "C" {
 
 typedef double ScratchNumber;
 
+typedef struct ScratchVector2d {
+  ScratchNumber x;
+  ScratchNumber y;
+} ScratchVector2d;
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif // #ifndef SCRATCH_VM_INCLUDE_TYPES_H_
+#endif  // #ifndef __SCRATCH_VM_INCLUDE_TYPES_H__

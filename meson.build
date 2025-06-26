@@ -23,6 +23,7 @@ add_project_arguments(['-Wno-unused-function'], language: 'c')
 # gtest enable
 gtest = subproject('gtest')
 gtest_dep = gtest.get_variable('gtest_main_dep')
+gmock_dep = gtest.get_variable('gmock_main_dep')
 
 if 'sdl' in get_option('frontend')
     sdl2 = subproject(
@@ -65,18 +66,28 @@ foreach module : required_modules
     endif
 endforeach
 
-scratch_vm_lib = static_library(
-    'scratch_vm_lib',
-    ['templates/scratch-vm-variables.c'],
-    c_args: '-DSCRATCH_VM_ALLOW_INCLUDES',
-)
+scratch_vm_lib_sources = [
+    'templates/scratch-vm-memory.c',
+    'templates/scratch-vm-variable.c',
+    'templates/scratch-vm-buffered-linked-list.c',
+    'templates/scratch-vm-linked-list.c',
+    'templates/scratch-vm-program.c',
+    'templates/scratch-vm-sprite.c',
+]
+scratch_vm_lib = static_library('scratch_vm_lib', scratch_vm_lib_sources)
 
+scratch_vm_lib_tests_sources = [
+    'tests/scratch-vm-variable_gtest.cpp',
+    'tests/scratch-vm-buffered-linked-list_gtest.cpp',
+    'tests/scratch-vm-linked-list_gtest.cpp',
+    'tests/scratch-vm-program_gtest.cpp',
+    'tests/scratch-vm-sprite_gtest.cpp',
+]
 scratch_vm_lib_tests_exe = executable(
     'scratch_vm_lib_tests_exe',
-    ['tests/scratch-vm-variables_gtest.cpp'],
-    link_with: [scratch_vm_lib],
-    dependencies: [gtest_dep],
-)
+    scratch_vm_lib_tests_sources,
+    link_with : [scratch_vm_lib],
+    dependencies : [gtest_dep, gmock_dep])
 test('scratch_vm_lib_tests', scratch_vm_lib_tests_exe)
 
 # Describe the binary using a dictionary with following fields:
@@ -89,16 +100,23 @@ test('scratch_vm_lib_tests', scratch_vm_lib_tests_exe)
 #   - enabled: true/false, true by default
 digital_clock_gtest = {
     'name' : 'digital_clock_gtest',
-    'scratch_program' : meson.project_source_root() / 'digital_clock.sb3',
-    'sources' : ['tests/digital_clock_gtest.cpp'],
-    'deps' : [gtest_dep],
+    'scratch_program' : meson.project_source_root() / 'digital-clock.sb3',
+    'sources' : [ 'tests/digital-clock_gtest.cpp' ],
+    'deps' : [gtest_dep, gmock_dep]
+}
+
+if_immediate_gtest = {
+    'name' : 'if_immediate_gtest',
+    'scratch_program' : meson.project_source_root() / 'if-immediate.sb3',
+    'sources' : [ 'tests/if-immediate_gtest.cpp' ],
+    'deps' : [gtest_dep, gmock_dep]
 }
 
 variables_gtest = {
     'name' : 'variables_gtest',
     'scratch_program' : meson.project_source_root() / 'variables.sb3',
-    'sources' : ['tests/variables_gtest.cpp'],
-    'deps' : [gtest_dep],
+    'sources' : [ 'tests/variables_gtest.cpp' ],
+    'deps' : [gtest_dep, gmock_dep]
 }
 
 variables_sdl = {
@@ -110,7 +128,8 @@ variables_sdl = {
 
 gen_targets = [
     # TODO(truvorskameikin): Re-enable after fixing.
-    # digital_clock_gtest,
+    digital_clock_gtest,
+    if_immediate_gtest,
     variables_gtest,
     variables_sdl,
 ]
