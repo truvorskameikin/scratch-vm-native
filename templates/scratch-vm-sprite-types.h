@@ -16,8 +16,8 @@ typedef struct ScratchSprite {
   ScratchNumber direction;
   ScratchNumber size;
   int costume_number;
+  int is_clone;
   void* internal_pointer_1;
-  void* internal_pointer_2;
 } ScratchSprite;
 
 #ifdef __cplusplus
