@@ -1,124 +1,100 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include <iostream>
+#include <vector>
 
 #include "templates/scratch-vm-sprite.h"
 
-// TEST(scratch_vm_sprite_gtest, init) {
-//   ScratchSprite sprite0;
-//   sprite0.position = {0, 0};
-//   sprite0.direction = 0;
-//   sprite0.size = 0;
-//   sprite0.costume_number = 0;
+using ::testing::ElementsAre;
 
-//   ScratchSprite sprite1;
-//   sprite1.position = {1, 1};
-//   sprite1.direction = 1;
-//   sprite1.size = 1;
-//   sprite1.costume_number = 1;
+struct Sprite1 {
+  ScratchInternalSprite internal_sprite;
+  ScratchVariable variables[3];
+} sprite1;
 
-//   ScratchSprite sprite2;
-//   sprite2.position = {2, 2};
-//   sprite2.direction = 2;
-//   sprite2.size = 2;
-//   sprite2.costume_number = 2;
+struct Sprite2 {
+  ScratchInternalSprite internal_sprite;
+  ScratchVariable variables[1];
+} sprite2;
 
-//   ScratchSprite sprite100;
-//   sprite100.position = {100, 100};
-//   sprite100.direction = 100;
-//   sprite100.size = 100;
-//   sprite100.costume_number = 100;
+struct Sprite3 {
+  ScratchInternalSprite internal_sprite;
+  ScratchVariable variables[50];
+} sprite3;
 
-//   const size_t num_sprites = 4;
-//   ScratchInternalSprite internal_sprites_raw_memory[num_sprites];
-//   ScratchMemoryBuffer all_sprites_memory_buffer = ScratchMemory_Alloc(
-//       internal_sprites_raw_memory, sizeof(ScratchInternalSprite) *
-//       num_sprites);
+void InitSprites() {
+  sprite1.internal_sprite._.position.x = 1;
+  sprite1.internal_sprite._.position.y = 1;
+  sprite1.internal_sprite._.direction = 1;
+  sprite1.internal_sprite._.costume_number = 1;
 
-//   ScratchAllSprites all_sprites =
-//       ScratchAllSprites_Init(&all_sprites_memory_buffer, num_sprites);
+  sprite2.internal_sprite._.position.x = 2;
+  sprite2.internal_sprite._.position.y = 20;
+  sprite2.internal_sprite._.direction = 2;
+  sprite2.internal_sprite._.costume_number = 200;
 
-//   ScratchAllSprites_InitSingleSprite(&all_sprites, 0, &sprite0);
-//   ScratchAllSprites_InitSingleSprite(&all_sprites, 1, &sprite1);
-//   ScratchAllSprites_InitSingleSprite(&all_sprites, 2, &sprite2);
-//   ScratchAllSprites_InitSingleSprite(&all_sprites, 3, &sprite100);
+  sprite3.internal_sprite._.position.x = 30;
+  sprite3.internal_sprite._.position.y = 3;
+  sprite3.internal_sprite._.direction = 30;
+  sprite3.internal_sprite._.costume_number = 3;
+}
 
-//   ScratchSprite* s0 = ScratchAllSprites_GetFirst(&all_sprites);
-//   ASSERT_EQ(s0->position.x, 0);
-//   ASSERT_EQ(s0->position.y, 0);
-//   ASSERT_EQ(s0->direction, 0);
-//   ASSERT_EQ(s0->size, 0);
-//   ASSERT_EQ(s0->costume_number, 0);
+std::vector<ScratchSprite*> toVector(ScratchAllSprites* all_sprites) {
+  std::vector<ScratchSprite*> result;
+  for (ScratchSprite* cur_sprite = ScratchAllSprites_GetFirst(all_sprites);
+       cur_sprite != 0;
+       cur_sprite = ScratchAllSprites_GetNext(all_sprites, cur_sprite)) {
+    result.push_back(cur_sprite);
+  }
+  return result;
+}
 
-//   ScratchSprite* s1 = ScratchAllSprites_GetNext(&all_sprites, s0);
-//   ASSERT_EQ(s1->position.x, 1);
-//   ASSERT_EQ(s1->position.y, 1);
-//   ASSERT_EQ(s1->direction, 1);
-//   ASSERT_EQ(s1->size, 1);
-//   ASSERT_EQ(s1->costume_number, 1);
+TEST(scratch_vm_sprite_gtest, all_sprites_init) {
+  InitSprites();
 
-//   ScratchSprite* s2 = ScratchAllSprites_GetNext(&all_sprites, s1);
-//   ASSERT_EQ(s2->position.x, 2);
-//   ASSERT_EQ(s2->position.y, 2);
-//   ASSERT_EQ(s2->direction, 2);
-//   ASSERT_EQ(s2->size, 2);
-//   ASSERT_EQ(s2->costume_number, 2);
+  ScratchInternalSprite* internal_sprite_1 = ScratchInternalSprite_InitInplace(
+      ScratchMemory_Alloc(&sprite1, sizeof(sprite1)),
+      sizeof(sprite1.variables) / sizeof(ScratchVariable));
 
-//   ScratchSprite* s3 = ScratchAllSprites_GetNext(&all_sprites, s2);
-//   ASSERT_EQ(s3->position.x, 100);
-//   ASSERT_EQ(s3->position.y, 100);
-//   ASSERT_EQ(s3->direction, 100);
-//   ASSERT_EQ(s3->size, 100);
-//   ASSERT_EQ(s3->costume_number, 100);
-// }
+  ScratchInternalSprite* internal_sprite_2 = ScratchInternalSprite_InitInplace(
+      ScratchMemory_Alloc(&sprite2, sizeof(sprite2)),
+      sizeof(sprite2.variables) / sizeof(ScratchVariable));
 
-// TEST(scratch_vm_sprite_gtest, clones) {
-//   ScratchSprite sprite0;
-//   sprite0.position = {0, 0};
-//   sprite0.direction = 0;
-//   sprite0.size = 0;
-//   sprite0.costume_number = 0;
+  ScratchInternalSprite* internal_sprite_3 = ScratchInternalSprite_InitInplace(
+      ScratchMemory_Alloc(&sprite3, sizeof(sprite3)),
+      sizeof(sprite3.variables) / sizeof(ScratchVariable));
 
-//   ScratchSprite sprite1;
-//   sprite1.position = {1, 1};
-//   sprite1.direction = 1;
-//   sprite1.size = 1;
-//   sprite1.costume_number = SCRATCH_VM_NUM_PREALLOCATED_CLONES + 10;
+  ScratchInternalSprite* parent_pointers[3];
+  ScratchList clones_of_parents[3];
 
-//   const size_t num_sprites = 2;
-//   ScratchInternalSprite internal_sprites_raw_memory[num_sprites];
-//   ScratchMemoryBuffer all_sprites_memory_buffer = ScratchMemory_Alloc(
-//       internal_sprites_raw_memory, sizeof(ScratchInternalSprite) *
-//       num_sprites);
+  ScratchAllSprites all_sprites = ScratchAllSprites_Init(
+      /*num_parent_sprites=*/3,
+      ScratchMemory_Alloc(parent_pointers, sizeof(parent_pointers)),
+      ScratchMemory_Alloc(clones_of_parents, sizeof(clones_of_parents)));
 
-//   ScratchAllSprites all_sprites =
-//       ScratchAllSprites_Init(&all_sprites_memory_buffer, num_sprites);
+  ScratchAllSprites_AddParentSprite(&all_sprites, /*parent_sprite_index=*/0,
+                                    internal_sprite_1);
+  ScratchAllSprites_AddParentSprite(&all_sprites, /*parent_sprite_index=*/1,
+                                    internal_sprite_2);
+  ScratchAllSprites_AddParentSprite(&all_sprites, /*parent_sprite_index=*/2,
+                                    internal_sprite_3);
 
-//   ScratchAllSprites_InitSingleSprite(&all_sprites, 0, &sprite0);
-//   ScratchAllSprites_InitSingleSprite(&all_sprites, 1, &sprite1);
+  std::vector<ScratchSprite*> sprites = toVector(&all_sprites);
+  
+  ASSERT_EQ(sprites.size(), 3);
+  std::vector<int> costumes(3);
+  std::transform(sprites.begin(), sprites.end(), costumes.begin(),
+                 [](auto sprite) { return sprite->costume_number; });
+  ASSERT_THAT(costumes, ElementsAre(1, 200, 3));
 
-//   size_t memory_used = ScratchMemory_UsedManagedMemory();
-
-//   ScratchSprite* s0 = ScratchAllSprites_GetFirst(&all_sprites);
-//   for (int i = 0; i < SCRATCH_VM_NUM_PREALLOCATED_CLONES; ++i) {
-//     ScratchSprite* s = ScratchSprite_Clone(s0);
-//     s->costume_number = i + 1;
-//   }
-
-//   ScratchSprite* cur_sprite = ScratchAllSprites_GetFirst(&all_sprites);
-//   for (int i = 0; i < SCRATCH_VM_NUM_PREALLOCATED_CLONES + 1; ++i) {
-//     ASSERT_EQ(cur_sprite->position.x, 0);
-//     ASSERT_EQ(cur_sprite->position.y, 0);
-//     ASSERT_EQ(cur_sprite->direction, 0);
-//     ASSERT_EQ(cur_sprite->size, 0);
-//     ASSERT_EQ(cur_sprite->costume_number, i);
-//     cur_sprite = ScratchAllSprites_GetNext(&all_sprites, cur_sprite);
-//   }
-
-//   ASSERT_EQ(cur_sprite->position.x, 1);
-//   ASSERT_EQ(cur_sprite->position.y, 1);
-//   ASSERT_EQ(cur_sprite->direction, 1);
-//   ASSERT_EQ(cur_sprite->size, 1);
-//   ASSERT_EQ(cur_sprite->costume_number,
-//             SCRATCH_VM_NUM_PREALLOCATED_CLONES + 10);
-
-//   ASSERT_GT(ScratchMemory_UsedManagedMemory() - memory_used, 0);
-// }
+  std::vector<double> positions_x(3);
+  std::transform(sprites.begin(), sprites.end(), positions_x.begin(),
+                 [](auto sprite) { return sprite->position.x; });
+  ASSERT_THAT(positions_x, ElementsAre(1, 2, 30));
+  
+  std::vector<double> positions_y(3);
+  std::transform(sprites.begin(), sprites.end(), positions_y.begin(),
+                 [](auto sprite) { return sprite->position.y; });
+  ASSERT_THAT(positions_y, ElementsAre(1, 20, 3));
+}
