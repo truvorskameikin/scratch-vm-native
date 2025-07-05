@@ -17,6 +17,8 @@ typedef struct ScratchInternalSprite {
   ScratchSprite _;
   ScratchListNode all_sprites_entry;
   ScratchListNode my_clones_entry;
+  size_t all_sprites_parent_index;
+  ScratchMemoryBuffer owning_buffer;
   size_t num_variables;
   ScratchMemoryBuffer variables_buffer;  // Buffer of ScratchVariable.
 } ScratchInternalSprite;
@@ -32,7 +34,9 @@ typedef struct ScratchAllSprites {
 
 size_t ScratchInternalSprite_GetMinBufferSize(size_t num_variables);
 ScratchInternalSprite* ScratchInternalSprite_InitInplace(
-    ScratchMemoryBuffer internal_sprite_buffer, size_t num_variables);
+    ScratchMemoryBuffer owning_buffer, size_t num_variables);
+ScratchInternalSprite* ScratchInternalSprite_CloneInplace(
+    ScratchMemoryBuffer owning_buffer, ScratchInternalSprite* to_clone);
 void ScratchInternalSprite_InitVariable(ScratchInternalSprite* internal_sprite,
                                         size_t variable_index,
                                         ScratchVariable* rhv);
@@ -47,48 +51,22 @@ ScratchAllSprites ScratchAllSprites_Init(
 void ScratchAllSprites_AddParentSprite(ScratchAllSprites* all_sprites,
                                        size_t parent_sprite_index,
                                        ScratchInternalSprite* internal_sprite);
+ScratchInternalSprite* ScratchAllSprites_Clone(ScratchAllSprites* all_sprites,
+                                               ScratchInternalSprite* to_clone);
+void ScratchAllSprites_DeleteClone(ScratchAllSprites* all_sprites,
+                                   ScratchInternalSprite* clone);
+// These functions will be used to provide sprites to VM clients. That is why
+// they provide pointers to ScratchSprite.
 ScratchSprite* ScratchAllSprites_GetFirst(ScratchAllSprites* all_sprites);
 ScratchSprite* ScratchAllSprites_GetNext(ScratchAllSprites* all_sprites,
                                          ScratchSprite* cur_sprite);
-
-// #if !defined(SCRATCH_VM_NUM_PREALLOCATED_CLONES)
-// #define SCRATCH_VM_NUM_PREALLOCATED_CLONES 8
-// #endif
-
-// #if !defined(SCRATCH_VM_NUM_NEXT_CLONES)
-// #define SCRATCH_VM_NUM_NEXT_CLONES 16
-// #endif
-
-// #define __CLONES_RAW_MEMORY_SIZE__ \
-//   (SCRATCH_VM_NUM_PREALLOCATED_CLONES * sizeof(ScratchSpriteListNode))
-
-// typedef struct ScratchSpriteListNode {
-//   ScratchBufferedListNode _;
-//   ScratchSprite sprite;
-// } ScratchSpriteListNode;
-
-// typedef struct ScratchInternalSprite {
-//   size_t index;
-//   ScratchBufferedList clones;
-//   char clones_raw_memory[__CLONES_RAW_MEMORY_SIZE__];
-// } ScratchInternalSprite;
-
-// typedef struct ScratchAllSprites {
-//   size_t num_sprites;
-//   ScratchMemoryBuffer internal_sprites_array;
-// } ScratchAllSprites;
-
-// ScratchSprite* ScratchSprite_Clone(ScratchSprite* cur_sprite);
-// void ScratchSprite_Delete(ScratchSprite* cur_sprite);
-
-// ScratchAllSprites ScratchAllSprites_Init(ScratchMemoryBuffer* sprites_array,
-//                                          size_t num_sprites);
-// void ScratchAllSprites_InitSingleSprite(ScratchAllSprites* all_sprites,
-//                                         size_t internal_sprite_index,
-//                                         ScratchSprite* sprite_ref);
-// ScratchSprite* ScratchAllSprites_GetFirst(ScratchAllSprites* all_sprites);
-// ScratchSprite* ScratchAllSprites_GetNext(ScratchAllSprites* all_sprites,
-//                                          ScratchSprite* cur_sprite);
+// These functions will be used to send broadcasts inside of VM. That why they
+// return pointers to ScratchInternalSprite.
+ScratchInternalSprite* ScratchAllSprites_GetFirstClone(
+    ScratchAllSprites* all_sprites, size_t parent_sprite_index);
+ScratchInternalSprite* ScratchAllSprites_GetNextClone(
+    ScratchAllSprites* all_sprites, size_t parent_sprite_index,
+    ScratchInternalSprite* cur_sprite);
 
 #ifdef __cplusplus
 }

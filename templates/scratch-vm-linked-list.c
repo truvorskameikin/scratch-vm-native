@@ -110,6 +110,29 @@ void ScratchList_InsertSorted(ScratchList* list, ScratchListNode* node,
   ScratchList_InsertBack(list, node);
 }
 
+void ScratchList_Remove(ScratchList* list, ScratchListNode* node) {
+  ScratchListNode* prev = node->prev;
+  ScratchListNode* next = node->next;
+
+  if (prev) {
+    prev->next = next;
+  }
+
+  if (next) {
+    next->prev = prev;
+  }
+
+  if (list->first == node) {
+    list->first = next;
+  }
+
+  if (list->last == node) {
+    list->last = prev;
+  }
+
+  --list->size;
+}
+
 size_t ScratchList_GetSize(ScratchList* list) { return list->size; }
 
 ScratchListNode* ScratchList_GetFirst(ScratchList* list) { return list->first; }

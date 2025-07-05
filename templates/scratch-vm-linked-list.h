@@ -34,6 +34,7 @@ void ScratchList_InsertAfter(ScratchList* list, ScratchListNode* insert_after,
                              ScratchListNode* node);
 void ScratchList_InsertSorted(ScratchList* list, ScratchListNode* node,
                               ScratchListNodeComparator comparator);
+void ScratchList_Remove(ScratchList* list, ScratchListNode* node);
 size_t ScratchList_GetSize(ScratchList* list);
 ScratchListNode* ScratchList_GetFirst(ScratchList* list);
 ScratchListNode* ScratchList_GetNext(ScratchList* list,

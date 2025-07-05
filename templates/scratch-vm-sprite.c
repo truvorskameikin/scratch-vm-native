@@ -28,17 +28,58 @@ ScratchInternalSprite_GetPointerFromAllSpritesNode(ScratchListNode* list_node) {
                                   all_sprites_entry_offset);
 }
 
+static ScratchInternalSprite* ScratchInternalSprite_GetPointerFromMyClonesNode(
+    ScratchListNode* list_node) {
+  if (list_node == 0) {
+    return 0;
+  }
+
+  size_t my_clones_entry_offset =
+      offsetof(ScratchInternalSprite, my_clones_entry);
+  return (ScratchInternalSprite*)(((char*)list_node) - my_clones_entry_offset);
+}
+
 ScratchInternalSprite* ScratchInternalSprite_InitInplace(
-    ScratchMemoryBuffer internal_sprite_buffer, size_t num_variables) {
+    ScratchMemoryBuffer owning_buffer, size_t num_variables) {
   assert(ScratchInternalSprite_GetMinBufferSize(num_variables) <=
-         internal_sprite_buffer.size);
+         owning_buffer.size);
 
   ScratchInternalSprite* internal_sprite =
-      (ScratchInternalSprite*)internal_sprite_buffer.buffer;
+      (ScratchInternalSprite*)owning_buffer.buffer;
+  internal_sprite->owning_buffer = owning_buffer;
   internal_sprite->num_variables = num_variables;
   internal_sprite->variables_buffer = ScratchMemory_AllocInplace(
-      (char*)internal_sprite_buffer.buffer + sizeof(ScratchInternalSprite),
+      (char*)owning_buffer.buffer + sizeof(ScratchInternalSprite),
       sizeof(ScratchVariable) * num_variables);
+
+  return internal_sprite;
+}
+
+ScratchInternalSprite* ScratchInternalSprite_CloneInplace(
+    ScratchMemoryBuffer owning_buffer, ScratchInternalSprite* to_clone) {
+  assert(ScratchInternalSprite_GetMinBufferSize(to_clone->num_variables) <=
+         owning_buffer.size);
+
+  ScratchInternalSprite* internal_sprite =
+      (ScratchInternalSprite*)owning_buffer.buffer;
+  internal_sprite->all_sprites_parent_index =
+      to_clone->all_sprites_parent_index;
+  internal_sprite->owning_buffer = owning_buffer;
+  internal_sprite->num_variables = to_clone->num_variables;
+  internal_sprite->variables_buffer = ScratchMemory_AllocInplace(
+      (char*)owning_buffer.buffer + sizeof(ScratchInternalSprite),
+      sizeof(ScratchVariable) * to_clone->num_variables);
+
+  ScratchVariable* variables = internal_sprite->variables_buffer.buffer;
+  ScratchVariable* to_clone_variables = to_clone->variables_buffer.buffer;
+
+  for (size_t i = 0; i < to_clone->num_variables; ++i) {
+    Scratch_AssignVariable(&variables[i], &to_clone_variables[i]);
+  }
+
+  ScratchSprite* dest_sprite = (ScratchSprite*)internal_sprite;
+  ScratchSprite* src_sprite = (ScratchSprite*)to_clone;
+  *dest_sprite = *src_sprite;
 
   return internal_sprite;
 }
@@ -82,6 +123,8 @@ ScratchAllSprites ScratchAllSprites_Init(
 void ScratchAllSprites_AddParentSprite(ScratchAllSprites* all_sprites,
                                        size_t parent_sprite_index,
                                        ScratchInternalSprite* internal_sprite) {
+  internal_sprite->all_sprites_parent_index = parent_sprite_index;
+
   ScratchInternalSprite** parent_sprites =
       (ScratchInternalSprite**)
           all_sprites->parent_pointers_sprites_buffer.buffer;
@@ -89,6 +132,43 @@ void ScratchAllSprites_AddParentSprite(ScratchAllSprites* all_sprites,
 
   ScratchList_InsertBack(&all_sprites->all_sprites_list,
                          &internal_sprite->all_sprites_entry);
+
+  ScratchList* clones_lists = all_sprites->clones_lists_buffer.buffer;
+  ScratchList_InsertBack(&clones_lists[parent_sprite_index],
+                         &internal_sprite->my_clones_entry);
+  ScratchSprite* sprite = (ScratchSprite*)internal_sprite;
+  sprite->is_clone = 0;
+}
+
+ScratchInternalSprite* ScratchAllSprites_Clone(
+    ScratchAllSprites* all_sprites, ScratchInternalSprite* to_clone) {
+  ScratchMemoryBuffer owning_buffer = ScratchMemory_Alloc(
+      /*unmanaged_buffer=*/0,
+      ScratchInternalSprite_GetMinBufferSize(to_clone->num_variables));
+  ScratchInternalSprite* clone =
+      ScratchInternalSprite_CloneInplace(owning_buffer, to_clone);
+
+  ScratchList_InsertBack(&all_sprites->all_sprites_list,
+                         &clone->all_sprites_entry);
+
+  ScratchList* clones_lists = all_sprites->clones_lists_buffer.buffer;
+  ScratchList_InsertFront(&clones_lists[clone->all_sprites_parent_index],
+                          &clone->my_clones_entry);
+
+  ScratchSprite* sprite = (ScratchSprite*)clone;
+  sprite->is_clone = 1;
+
+  return clone;
+}
+
+void ScratchAllSprites_DeleteClone(ScratchAllSprites* all_sprites,
+                                   ScratchInternalSprite* clone) {
+  ScratchSprite* sprite = (ScratchSprite*)clone;
+  if (!sprite->is_clone) {
+    return;
+  }
+
+  ScratchList_Remove(&all_sprites->all_sprites_list, &clone->all_sprites_entry);
 }
 
 ScratchSprite* ScratchAllSprites_GetFirst(ScratchAllSprites* all_sprites) {
@@ -107,130 +187,19 @@ ScratchSprite* ScratchAllSprites_GetNext(ScratchAllSprites* all_sprites,
       next_list_node);
 }
 
-// static ScratchInternalSprite* ScratchSprite_GetInternalSprite(
-//     ScratchSprite* sprite) {
-//   return (ScratchInternalSprite*)sprite->internal_pointer_1;
-// }
+ScratchInternalSprite* ScratchAllSprites_GetFirstClone(
+    ScratchAllSprites* all_sprites, size_t parent_sprite_index) {
+  ScratchList* clones_lists = all_sprites->clones_lists_buffer.buffer;
+  ScratchListNode* list_node =
+      ScratchList_GetFirst(&clones_lists[parent_sprite_index]);
+  return ScratchInternalSprite_GetPointerFromMyClonesNode(list_node);
+}
 
-// static ScratchSpriteListNode* ScratchSprite_GetListNode(ScratchSprite*
-// sprite) {
-//   return (ScratchSpriteListNode*)sprite->internal_pointer_2;
-// }
-
-// // =====
-// // ScratchSprite
-// // =====
-// ScratchSprite* ScratchSprite_Clone(ScratchSprite* cur_sprite) {
-//   ScratchInternalSprite* internal_sprite =
-//       ScratchSprite_GetInternalSprite(cur_sprite);
-
-//   ScratchSpriteListNode* sprite_list_node =
-//       (ScratchSpriteListNode*)ScratchBufferedList_InsertNew(
-//           &internal_sprite->clones);
-
-//   sprite_list_node->sprite = *cur_sprite;
-//   sprite_list_node->sprite.internal_pointer_1 = internal_sprite;
-//   sprite_list_node->sprite.internal_pointer_2 = sprite_list_node;
-
-//   return &sprite_list_node->sprite;
-// }
-
-// void ScratchSprite_Delete(ScratchSprite* cur_sprite) {
-//   ScratchInternalSprite* internal_sprite =
-//       ScratchSprite_GetInternalSprite(cur_sprite);
-//   ScratchSpriteListNode* list_node = ScratchSprite_GetListNode(cur_sprite);
-
-//   ScratchBufferedList_Remove(&internal_sprite->clones,
-//                              (ScratchBufferedListNode*)list_node);
-// }
-
-// // =====
-// // ScratchAllSprites
-// // =====
-// ScratchAllSprites ScratchAllSprites_Init(ScratchMemoryBuffer* sprites_array,
-//                                          size_t num_sprites) {
-//   assert(sprites_array->size >= sizeof(ScratchInternalSprite) * num_sprites
-//   &&
-//          "Buffer should be big enough to contain all internal sprites.");
-
-//   ScratchAllSprites result;
-//   result.num_sprites = num_sprites;
-//   result.internal_sprites_array = *sprites_array;
-
-//   ScratchInternalSprite* internal_sprites =
-//       (ScratchInternalSprite*)result.internal_sprites_array.buffer;
-
-//   for (size_t i = 0; i < num_sprites; ++i) {
-//     internal_sprites[i].index = i;
-
-//     ScratchMemoryBuffer memory_buffer = ScratchMemory_AllocInplace(
-//         internal_sprites[i].clones_raw_memory, __CLONES_RAW_MEMORY_SIZE__);
-//     internal_sprites[i].clones = ScratchBufferedList_Init(
-//         sizeof(ScratchSpriteListNode), SCRATCH_VM_NUM_PREALLOCATED_CLONES,
-//         SCRATCH_VM_NUM_NEXT_CLONES, &memory_buffer);
-//   }
-
-//   return result;
-// }
-
-// void ScratchAllSprites_InitSingleSprite(ScratchAllSprites* all_sprites,
-//                                         size_t internal_sprite_index,
-//                                         ScratchSprite* sprite_ref) {
-//   ScratchInternalSprite* internal_sprites =
-//       (ScratchInternalSprite*)all_sprites->internal_sprites_array.buffer;
-
-//   assert(ScratchBufferedList_Size(
-//              &internal_sprites[internal_sprite_index].clones) == 0 &&
-//          "InitSingleSprite also creates the first \"clone\".");
-
-//   ScratchSpriteListNode* sprite_list_node =
-//       (ScratchSpriteListNode*)ScratchBufferedList_InsertNew(
-//           &internal_sprites[internal_sprite_index].clones);
-
-//   sprite_list_node->sprite = *sprite_ref;
-//   sprite_list_node->sprite.internal_pointer_1 =
-//       &internal_sprites[internal_sprite_index];
-//   sprite_list_node->sprite.internal_pointer_2 = sprite_list_node;
-// }
-
-// ScratchSprite* ScratchAllSprites_GetFirst(ScratchAllSprites* all_sprites) {
-//   if (all_sprites->num_sprites == 0) {
-//     return 0;
-//   }
-
-//   ScratchInternalSprite* internal_sprites =
-//       (ScratchInternalSprite*)all_sprites->internal_sprites_array.buffer;
-//   ScratchSpriteListNode* sprite_list_node =
-//       (ScratchSpriteListNode*)ScratchBufferedList_GetFirst(
-//           &internal_sprites[0].clones);
-
-//   return &sprite_list_node->sprite;
-// }
-
-// ScratchSprite* ScratchAllSprites_GetNext(ScratchAllSprites* all_sprites,
-//                                          ScratchSprite* cur_sprite) {
-//   ScratchInternalSprite* internal_sprite =
-//       ScratchSprite_GetInternalSprite(cur_sprite);
-//   ScratchSpriteListNode* list_node = ScratchSprite_GetListNode(cur_sprite);
-
-//   ScratchSpriteListNode* next_list_node =
-//       (ScratchSpriteListNode*)ScratchBufferedList_GetNext(
-//           &internal_sprite->clones, (ScratchBufferedListNode*)list_node);
-//   if (next_list_node) {
-//     return &next_list_node->sprite;
-//   }
-
-//   size_t next_index = internal_sprite->index + 1;
-//   if (next_index >= all_sprites->num_sprites) {
-//     return 0;
-//   }
-
-//   ScratchInternalSprite* internal_sprites =
-//       (ScratchInternalSprite*)all_sprites->internal_sprites_array.buffer;
-
-//   ScratchSpriteListNode* first_list_node =
-//       (ScratchSpriteListNode*)ScratchBufferedList_GetFirst(
-//           &internal_sprites[next_index].clones);
-
-//   return &first_list_node->sprite;
-// }
+ScratchInternalSprite* ScratchAllSprites_GetNextClone(
+    ScratchAllSprites* all_sprites, size_t parent_sprite_index,
+    ScratchInternalSprite* cur_sprite) {
+  ScratchList* clones_lists = all_sprites->clones_lists_buffer.buffer;
+  ScratchListNode* next_list_node = ScratchList_GetNext(
+      &clones_lists[parent_sprite_index], &cur_sprite->my_clones_entry);
+  return ScratchInternalSprite_GetPointerFromMyClonesNode(next_list_node);
+}

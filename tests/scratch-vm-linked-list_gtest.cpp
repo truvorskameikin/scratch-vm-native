@@ -211,3 +211,34 @@ TEST(scratch_vm_linked_list_gtest, sorted_inserts) {
   ASSERT_EQ(ScratchList_GetSize(&list), 5);
   ASSERT_THAT(toVector(&list), ElementsAre(1, 2, 3, 4, 5));
 }
+
+TEST(scratch_vm_linked_list_gtest, remove) {
+  TestNode node1;
+  node1.value = 1;
+
+  TestNode node2;
+  node2.value = 2;
+
+  TestNode node3;
+  node3.value = 3;
+
+  TestNode node4;
+  node4.value = 4;
+
+  TestNode node5;
+  node5.value = 5;
+
+  ScratchList list = ScratchList_Init();
+  ScratchList_InsertSorted(&list, (ScratchListNode*)&node3, comp);
+  ScratchList_InsertSorted(&list, (ScratchListNode*)&node2, comp);
+  ScratchList_InsertSorted(&list, (ScratchListNode*)&node5, comp);
+  ScratchList_InsertSorted(&list, (ScratchListNode*)&node1, comp);
+  ScratchList_InsertSorted(&list, (ScratchListNode*)&node4, comp);
+
+  ScratchList_Remove(&list, (ScratchListNode*)&node1);
+  ScratchList_Remove(&list, (ScratchListNode*)&node5);
+  ScratchList_Remove(&list, (ScratchListNode*)&node3);
+
+  ASSERT_EQ(ScratchList_GetSize(&list), 2);
+  ASSERT_THAT(toVector(&list), ElementsAre(2, 4));
+}
