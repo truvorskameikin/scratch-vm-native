@@ -1,0 +1,1 @@
+option('frontend', type : 'array', choices : ['sdl'], value : ['sdl'])

@@ -44,6 +44,8 @@ typedef struct ScratchRuntimeControlWait {
 typedef struct ScratchProgram {
   unsigned int cur_iteration;
   ScratchStack stack;
+  ScratchInternalSprite* internal_sprite;
+  ScratchSprite* sprite;
 } ScratchProgram;
 
 size_t ScratchStack_MinBufferSize(ScratchMemoryBuffer* runtimes_sizes_buffer);

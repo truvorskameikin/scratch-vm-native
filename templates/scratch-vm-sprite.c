@@ -28,6 +28,7 @@ ScratchInternalSprite_GetPointerFromAllSpritesNode(ScratchListNode* list_node) {
                                   all_sprites_entry_offset);
 }
 
+<<<<<<< HEAD
 static ScratchInternalSprite* ScratchInternalSprite_GetPointerFromMyClonesNode(
     ScratchListNode* list_node) {
   if (list_node == 0) {
@@ -50,11 +51,24 @@ ScratchInternalSprite* ScratchInternalSprite_InitInplace(
   internal_sprite->num_variables = num_variables;
   internal_sprite->variables_buffer = ScratchMemory_AllocInplace(
       (char*)owning_buffer.buffer + sizeof(ScratchInternalSprite),
+=======
+ScratchInternalSprite* ScratchInternalSprite_InitInplace(
+    ScratchMemoryBuffer internal_sprite_buffer, size_t num_variables) {
+  assert(ScratchInternalSprite_GetMinBufferSize(num_variables) <=
+         internal_sprite_buffer.size);
+
+  ScratchInternalSprite* internal_sprite =
+      (ScratchInternalSprite*)internal_sprite_buffer.buffer;
+  internal_sprite->num_variables = num_variables;
+  internal_sprite->variables_buffer = ScratchMemory_AllocInplace(
+      (char*)internal_sprite_buffer.buffer + sizeof(ScratchInternalSprite),
+>>>>>>> main
       sizeof(ScratchVariable) * num_variables);
 
   return internal_sprite;
 }
 
+<<<<<<< HEAD
 ScratchInternalSprite* ScratchInternalSprite_CloneInplace(
     ScratchMemoryBuffer owning_buffer, ScratchInternalSprite* to_clone) {
   assert(ScratchInternalSprite_GetMinBufferSize(to_clone->num_variables) <=
@@ -84,6 +98,8 @@ ScratchInternalSprite* ScratchInternalSprite_CloneInplace(
   return internal_sprite;
 }
 
+=======
+>>>>>>> main
 void ScratchInternalSprite_InitVariable(ScratchInternalSprite* internal_sprite,
                                         size_t variable_index,
                                         ScratchVariable* rhv) {

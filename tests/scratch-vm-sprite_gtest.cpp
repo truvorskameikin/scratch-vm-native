@@ -106,7 +106,6 @@ TEST(scratch_vm_sprite_gtest, all_sprites_init) {
   std::transform(sprites.begin(), sprites.end(), positions_x.begin(),
                  [](auto sprite) { return sprite->position.x; });
   ASSERT_THAT(positions_x, ElementsAre(1, 2, 30));
-
   std::vector<double> positions_y(3);
   std::transform(sprites.begin(), sprites.end(), positions_y.begin(),
                  [](auto sprite) { return sprite->position.y; });
