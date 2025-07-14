@@ -2,8 +2,6 @@
 #define __SCRATCH_VM_INCLUDE_SPRITE_H__
 
 #if !defined(__SCRATCH_VM_INSIDE_TEMPLATE__)
-#include <stddef.h>
-
 #include "scratch-vm-linked-list.h"
 #include "scratch-vm-sprite-types.h"
 #include "scratch-vm-variable.h"

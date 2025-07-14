@@ -7,11 +7,14 @@
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 
 {% include 'scratch-vm-types.h' without context %}
 
 {% include 'scratch-vm-memory.h' without context %}
+
+{% include 'scratch-vm-linked-list.h' without context %}
 
 {% include 'scratch-vm-buffered-linked-list.h' without context %}
 
@@ -28,6 +31,8 @@
 {% include 'scratch-vm-program.h' without context %}
 
 {% include 'scratch-vm-memory.c' without context %}
+
+{% include 'scratch-vm-linked-list.c' without context %}
 
 {% include 'scratch-vm-buffered-linked-list.c' without context %}
 
